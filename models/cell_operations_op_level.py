@@ -157,8 +157,42 @@ class Zero(nn.Module):
         shape[1] = self.C_out
         zeros = x.new_zeros(shape, dtype=x.dtype, device=x.device)
         return zeros
-
-    
     
   def extra_repr(self):
     return 'C_in={C_in}, C_out={C_out}, stride={stride}'.format(**self.__dict__)
+
+
+class FactorizedReduce(nn.Module):
+
+  def __init__(self, C_in, C_out, stride, affine, track_running_stats):
+    super(FactorizedReduce, self).__init__()
+    self.stride = stride
+    self.C_in   = C_in  
+    self.C_out  = C_out  
+    self.relu   = nn.ReLU(inplace=False)
+    if stride == 2:
+      #assert C_out % 2 == 0, 'C_out : {:}'.format(C_out)
+      C_outs = [C_out // 2, C_out - C_out // 2]
+      self.convs = nn.ModuleList()
+      for i in range(2):
+        self.convs.append( nn.Conv2d(C_in, C_outs[i], 1, stride=stride, padding=0, bias=False) )
+      self.pad = nn.ConstantPad2d((0, 1, 0, 1), 0)
+    elif stride == 1:
+      self.conv = nn.Conv2d(C_in, C_out, 1, stride=stride, padding=0, bias=False)
+    else:
+      raise ValueError('Invalid stride : {:}'.format(stride))
+    self.bn = nn.BatchNorm2d(C_out, affine=affine, track_running_stats=track_running_stats)
+
+  def forward(self, x):
+    if self.stride == 2:
+      x = self.relu(x)
+      y = self.pad(x)
+      out = torch.cat([self.convs[0](x), self.convs[1](y[:,:,1:,1:])], dim=1)
+    else:
+      out = self.conv(x)
+    out = self.bn(out)
+    return out
+
+  def extra_repr(self):
+    return 'C_in={C_in}, C_out={C_out}, stride={stride}'.format(**self.__dict__)
+

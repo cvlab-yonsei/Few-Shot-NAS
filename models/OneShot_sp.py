@@ -12,7 +12,8 @@ from utils.genotypes        import Structure
 
 
 class UniformRandomSupernet_splitable(nn.Module):
-    def __init__(self, C, N, max_nodes, num_classes, 
+    def __init__(self, 
+                 C, N, max_nodes, num_classes, 
                  search_space, 
                  affine, track_running_stats,
                  split_info, option):
@@ -172,6 +173,7 @@ class UniformRandomSupernet_splitable(nn.Module):
 #         arch = Structure(genotypes)
 #         return arch
 
+    ## NOTE: This is to avoid Trash Archs
     def random_genotype(self):
         genotypes = []
         for i in range(1, self.max_nodes):
