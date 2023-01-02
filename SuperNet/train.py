@@ -120,6 +120,11 @@ def main(xargs):
   )
   logger.log(search_model)
 
+  num_params = 0.
+  num_params += sum(p.numel() for p in search_model.parameters() if p.requires_grad)
+  num_params /= 1e6
+  logger.log(f"# of params (M) : {num_params:.3f}")
+
   w_optimizer, w_scheduler, criterion = get_optim_scheduler(search_model.parameters(), config)
   logger.log('optimizer : {:}'.format(w_optimizer))
   logger.log('scheduler : {:}'.format(w_scheduler))
@@ -140,7 +145,7 @@ def main(xargs):
   COUNTS = {}
   for k in json.load(open('./SuperNet/logs/gt_c10', 'r')).keys():
     COUNTS[k] = 0
-  writer = SummaryWriter(log_dir=f'./tb_logs/seed-{xargs.rand_seed}')
+#  writer = SummaryWriter(log_dir=f'./tb_logs/seed-{xargs.rand_seed}')
 
   OP_CNTS = [{name: 0 for name in NAS_BENCH_201} for _ in range(6)]
 
@@ -156,24 +161,24 @@ def main(xargs):
 
     logger.log('<<<--->>> The {:}-th epoch'.format(epoch_str))
 
-    with torch.no_grad():
-      current_w = search_model.state_dict()
-      for key, init_w in INIT_W.items():
-        if 'stem.0' in key or 'classifier.weight' in key:
-          curr_w = current_w[key]
-          cos_sim = torch.nn.functional.cosine_similarity(curr_w.flatten(), init_w.flatten(), dim=0)
-          writer.add_scalar(key, cos_sim, epoch)
-        if 'cells' in key:
-          if 'edges' in key:
-            curr_w = current_w[key]
-            cos_sim = torch.nn.functional.cosine_similarity(curr_w.flatten(), init_w.flatten(), dim=0)
-            _name1, _name2 = key.split('.edges.')
-            writer.add_scalars(_name1, {_name2: cos_sim}, epoch)
-          else:
-            if '1.weight' in key:
-              curr_w = current_w[key]
-              cos_sim = torch.nn.functional.cosine_similarity(curr_w.flatten(), init_w.flatten(), dim=0)
-              writer.add_scalars(key[:8], {key[8:]: cos_sim}, epoch)
+#    with torch.no_grad():
+#      current_w = search_model.state_dict()
+#      for key, init_w in INIT_W.items():
+#        if 'stem.0' in key or 'classifier.weight' in key:
+#          curr_w = current_w[key]
+#          cos_sim = torch.nn.functional.cosine_similarity(curr_w.flatten(), init_w.flatten(), dim=0)
+#          writer.add_scalar(key, cos_sim, epoch)
+#        if 'cells' in key:
+#          if 'edges' in key:
+#            curr_w = current_w[key]
+#            cos_sim = torch.nn.functional.cosine_similarity(curr_w.flatten(), init_w.flatten(), dim=0)
+#            _name1, _name2 = key.split('.edges.')
+#            writer.add_scalars(_name1, {_name2: cos_sim}, epoch)
+#          else:
+#            if '1.weight' in key:
+#              curr_w = current_w[key]
+#              cos_sim = torch.nn.functional.cosine_similarity(curr_w.flatten(), init_w.flatten(), dim=0)
+#              writer.add_scalars(key[:8], {key[8:]: cos_sim}, epoch)
 
     save_checkpoint({'count': COUNTS, 'op_cnts': OP_CNTS, 'search_model': search_model.state_dict(),}, logger.model_dir / f"seed-{xargs.rand_seed}-ep{epoch:03d}.pth", logger)
     #save_checkpoint({'epoch': epoch + 1, 'search_model': search_model.state_dict(),}, model_base_path, logger)
@@ -183,7 +188,7 @@ def main(xargs):
   save_checkpoint({'epoch': epoch + 1, 'args': deepcopy(xargs), 'search_model': search_model.state_dict(),}, logger.model_dir / f"seed-{xargs.rand_seed}-last.pth", logger)
   logger.log('\n' + '-' * 100)
   logger.close()
-  writer.close()
+#  writer.close()
 
 
 if __name__ == '__main__':
@@ -200,7 +205,6 @@ if __name__ == '__main__':
   # log
   parser.add_argument('--workers',            type=int,   default=2,    help='number of data loading workers (default: 2)')
   parser.add_argument('--save_dir',           type=str,   help='Folder to save checkpoints and log.')
-  parser.add_argument('--arch_nas_dataset',   type=str,   help='The path to load the architecture dataset (tiny-nas-benchmark).')
   parser.add_argument('--print_freq',         type=int,   help='print frequency (default: 200)')
   parser.add_argument('--rand_seed',          type=int,   help='manual seed')
   args = parser.parse_args()

@@ -49,33 +49,32 @@ def valid_func(train_loader, valid_loader, network, criterion, valid_arch, logge
     
 
 ##### NOTE: Measure Valid Acc. with a SINGLE mini-batch 
-    network.eval()
-    valid_iter = iter(valid_loader)
-    try:
-      inputs, targets = next(valid_iter)
-    except:
-      valid_iter = iter(valid_loader)
-      inputs, targets = next(valid_iter)
-    #_, logits = network(inputs.cuda(non_blocking=True), valid_arch) 
-    logits = network(inputs.cuda(non_blocking=True), valid_arch) 
-    loss = criterion(logits, targets.cuda(non_blocking=True))
-    val_top1, val_top5 = obtain_accuracy(logits.cpu().data, targets.data, topk=(1, 5))
-  return loss.item(), val_top1.item(), val_top5.item()
+#    network.eval()
+#    valid_iter = iter(valid_loader)
+#    try:
+#      inputs, targets = next(valid_iter)
+#    except:
+#      valid_iter = iter(valid_loader)
+#      inputs, targets = next(valid_iter)
+#    #_, logits = network(inputs.cuda(non_blocking=True), valid_arch) 
+#    logits = network(inputs.cuda(non_blocking=True), valid_arch) 
+#    loss = criterion(logits, targets.cuda(non_blocking=True))
+#    val_top1, val_top5 = obtain_accuracy(logits.cpu().data, targets.data, topk=(1, 5))
+#  return loss.item(), val_top1.item(), val_top5.item()
 
 
 ##### NOTE: Measure Valid Acc. with a WHOLE dataset
-#    network.eval()
-#    for step, (arch_inputs, arch_targets) in enumerate(valid_loader):
-#      arch_targets = arch_targets.cuda(non_blocking=True)
-#      # prediction
-#      logits = network(arch_inputs.cuda(non_blocking=True), valid_arch) 
-#      arch_loss = criterion(logits, arch_targets)
-#      # record
-#      arch_prec1, arch_prec5 = obtain_accuracy(logits.data, arch_targets.data, topk=(1, 5))
-#      arch_losses.update(arch_loss.item(),  arch_inputs.size(0))
-#      arch_top1.update(arch_prec1.item(), arch_inputs.size(0))
-#      arch_top5.update(arch_prec5.item(), arch_inputs.size(0))
-#  return arch_losses.avg, arch_top1.avg, arch_top5.avg
+    network.eval()
+    for step, (arch_inputs, arch_targets) in enumerate(valid_loader):
+      arch_targets = arch_targets.cuda(non_blocking=True)
+      #_, logits = network(arch_inputs.cuda(non_blocking=True), valid_arch) 
+      logits = network(arch_inputs.cuda(non_blocking=True), valid_arch) 
+      arch_loss = criterion(logits, arch_targets)
+      arch_prec1, arch_prec5 = obtain_accuracy(logits.data, arch_targets.data, topk=(1, 5))
+      arch_losses.update(arch_loss.item(),  arch_inputs.size(0))
+      arch_top1.update(arch_prec1.item(), arch_inputs.size(0))
+      arch_top5.update(arch_prec5.item(), arch_inputs.size(0))
+  return arch_losses.avg, arch_top1.avg, arch_top5.avg
 
 
 def main(xargs):
@@ -154,6 +153,7 @@ def main(xargs):
       json.dump(archs_dict, f)
   search_time = time.time() - start_time
   logger.log("Search Time: {:.1f} s".format(search_time))
+  logger.log("=> END '{:}'".format(ckpt_path))
   logger.close()
 
 

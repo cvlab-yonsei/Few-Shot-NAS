@@ -21,5 +21,5 @@ CUDA_VISIBLE_DEVICES=${NUM_GPU} OMP_NUM_THREADS=4 python ./SuperNet/train.py \
 	--channel ${channel} --num_cells ${num_cells} \
     --track_running_stats ${BN} \
 	--config_path SuperNet/configs/OneShotFromAutoDL.config \
-	--workers 4 --save_dir ${save_dir} --arch_nas_dataset ${benchmark_file} \
+	--workers 4 --save_dir ${save_dir} \
 	--print_freq 200 --rand_seed ${SEED} 

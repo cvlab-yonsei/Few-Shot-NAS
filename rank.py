@@ -5,15 +5,10 @@ import torch
 from scipy import stats
 
 
-#NAME='seed-0-basic_2nd'
-#NAME='seed-5349-basic_4th'
-#NAME='seed-5983-basic_5th10064'
-#NAME='seed-0-basic_1st'
-#NAME='seed-0-fffwocal'
-#NAME='seed-0-fffinit'
-NAME='seed-0-fff'
-#NAME='seed-5349-basic'
-#NAME='seed-5983-fff'
+SEED=5983
+#NAME=f'seed-{SEED}-opt5-wotrash'
+#NAME=f'seed-{SEED}-opt5-wotrash-baseline-750'
+NAME=f'seed-{SEED}-opt5-wotrash-decom5-5-15-20-128-750'
 print("-*"*10)
 print(NAME)
 print("-*"*10)

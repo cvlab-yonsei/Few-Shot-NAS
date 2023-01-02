@@ -10,12 +10,12 @@ max_nodes=4
 space=nas-bench-201
 
 data_path="../data/cifar.python"
-benchmark_file=../data/NAS-Bench-201-v1_0-e61699.pth
 
 save_dir=./SuperNet
 OUTPUT=./SuperNet/logs
-CKPT=seed-0-fff.pth
-#CKPT=seed-5983-basic_5th.pth
+#CKPT=seed-0-opt5-wotrash/seed-0-last.pth
+CKPT=seed-5349-opt5-wotrash-baseline-250/seed-5349-last.pth
+#CKPT=seed-5983-opt5-wotrash-decom5-5-15-20-128-750/seed-5983-last.pth
 BN=0
 
 CUDA_VISIBLE_DEVICES=${NUM_GPU} OMP_NUM_THREADS=4 python ./SuperNet/search_all.py \
@@ -24,7 +24,7 @@ CUDA_VISIBLE_DEVICES=${NUM_GPU} OMP_NUM_THREADS=4 python ./SuperNet/search_all.p
     --channel ${channel} --num_cells ${num_cells} \
     --track_running_stats ${BN} \
     --config_path SuperNet/configs/OneShotFromAutoDL.config \
-    --workers 4 --save_dir ${save_dir} --arch_nas_dataset ${benchmark_file} \
+    --workers 4 --save_dir ${save_dir} \
     --rand_seed 0 \
     --output_dir ${OUTPUT} --edge_op ${SPLIT} \
     --ckpt ${CKPT}

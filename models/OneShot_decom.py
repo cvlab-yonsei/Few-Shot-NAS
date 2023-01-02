@@ -36,6 +36,14 @@ class UniformRandomSupernet_decom(nn.Module):
             if reduction:
                 cell = ResNetBasicblock(C_prev, C_curr, 2, affine, track_running_stats,)
             else:
+#                cell = nn.ModuleList([ 
+#                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats),
+#                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats),
+#                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats)
+#                    ])
+#                if num_edge is None: num_edge, edge2index = cell[0].num_edges, cell[0].edge2index
+#                else: assert num_edge == cell[0].num_edges and edge2index == cell[0].edge2index, 'invalid {:} vs. {:}.'.format(num_edge, cell[0].num_edges)
+
                 if index > 5:
                     cell = nn.ModuleList([ 
                         SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats),
@@ -64,6 +72,9 @@ class UniformRandomSupernet_decom(nn.Module):
 
         self.op_names   = deepcopy(search_space)
         self._Layer     = len(self.cells)
+        
+        self.MIN = 15 
+        self.MAX = 20
 
 
     def get_message(self):
@@ -177,13 +188,13 @@ class UniformRandomSupernet_decom(nn.Module):
                     feature = cell.forward_dynamic(feature, self.random_genotype())
             elif isinstance(cell, nn.ModuleList):
                 acc_num += [acc_num[-1] + NUM_WITHIN_CELL]
-                if acc_num[-1] <= 15:
+                if acc_num[-1] <= self.MIN:
                     #print(index, 0)
                     tmp = cell[0]
-                if acc_num[-1] > 15 and acc_num[-1] <= 30:
+                if acc_num[-1] > self.MIN and acc_num[-1] <= self.MAX:
                     #print(index, 1)
                     tmp = cell[1]
-                if acc_num[-1] > 30:
+                if acc_num[-1] > self.MAX:
                     #print(index, 2)
                     tmp = cell[2]
 

@@ -56,16 +56,51 @@ class UniformRandomSupernet(nn.Module):
   def extra_repr(self):
     return ('{name}(C={_C}, Max-Nodes={max_nodes}, N={_layerN}, L={_Layer})'.format(name=self.__class__.__name__, **self.__dict__))
 
+#  def random_genotype(self):
+#    genotypes = []
+#    for i in range(1, self.max_nodes):
+#      xlist = []
+#      for j in range(i):
+#        op_name = random.choice(self.op_names)
+#        xlist.append((op_name, j))
+#      genotypes.append(tuple(xlist))
+#    arch = Structure(genotypes)
+#    return arch
+
+  ## NOTE: This is to avoid Trash Archs
   def random_genotype(self):
-    genotypes = []
-    for i in range(1, self.max_nodes):
-      xlist = []
-      for j in range(i):
-        op_name = random.choice(self.op_names)
-        xlist.append((op_name, j))
-      genotypes.append(tuple(xlist))
-    arch = Structure(genotypes)
-    return arch
+      genotypes = []
+      for i in range(1, self.max_nodes):
+          xlist = []
+          if i==self.max_nodes-1:
+              if genotypes[0][0][0]=='none':
+                  if genotypes[1][0][0]=='none':
+                      for j in range(i):
+                          op_name = random.choice(self.op_names[1:])
+                          xlist.append((op_name, j))
+                  else:
+                      for j in range(i):
+                          if j==i-1 and xlist[0][0]=='none':
+                              op_name = random.choice(self.op_names[1:])
+                              xlist.append((op_name, j))
+                          else:
+                              op_name = random.choice(self.op_names)
+                              xlist.append((op_name, j))
+              else:
+                  for j in range(i):
+                      if j==i-1 and xlist[0][0]=='none' and xlist[1][0]=='none':
+                          op_name = random.choice(self.op_names[1:])
+                          xlist.append((op_name, j))
+                      else:
+                          op_name = random.choice(self.op_names)
+                          xlist.append((op_name, j))
+          else:
+              for j in range(i):
+                  op_name = random.choice(self.op_names)
+                  xlist.append((op_name, j))
+          genotypes.append(tuple(xlist))
+      arch = Structure(genotypes)
+      return arch
 
   def forward(self, inputs, arch=None):
     feature = self.stem(inputs)

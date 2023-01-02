@@ -89,6 +89,13 @@ def main(xargs):
   )
   logger.log(search_model)
 
+  num_params = 0.
+  num_params += sum(p.numel() for p in search_model.parameters() if p.requires_grad)
+  num_params /= 1e6
+  logger.log(f"# of params (M) : {num_params:.3f}")
+  logger.log(f"Threshold MIN : {search_model.MIN}")
+  logger.log(f"Threshold MAX : {search_model.MAX}")
+
   w_optimizer, w_scheduler, criterion = get_optim_scheduler(search_model.parameters(), config)
   logger.log('optimizer : {:}'.format(w_optimizer))
   logger.log('scheduler : {:}'.format(w_scheduler))
