@@ -14,7 +14,7 @@ data_path="../data/cifar.python"
 save_dir=./SuperNet
 OUTPUT=./SuperNet/logs
 #CKPT=seed-0-opt5-wotrash/seed-0-last.pth
-CKPT=seed-5349-opt5-wotrash-baseline-250/seed-5349-last.pth
+CKPT=seed-5349-opt5-wotrash-baseline-750/seed-5349-last.pth
 #CKPT=seed-5983-opt5-wotrash-decom5-5-15-20-128-750/seed-5983-last.pth
 BN=0
 
