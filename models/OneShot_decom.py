@@ -3,6 +3,7 @@
 ##############################################################################
 # Random Search and Reproducibility for Neural Architecture Search, UAI 2019 # 
 ##############################################################################
+import json
 import torch, random
 import torch.nn as nn
 from copy import deepcopy
@@ -74,8 +75,34 @@ class UniformRandomSupernet_decom(nn.Module):
         self._Layer     = len(self.cells)
         
         self.MIN = 15 
-        self.MAX = 20
+        self.MAX = 20 
 
+        with open(f"./eff_num_of_nonlinearity_0.txt", "r") as fp: self.partition0 = json.load(fp)
+        with open(f"./eff_num_of_nonlinearity_1.txt", "r") as fp: self.partition1 = json.load(fp)
+        with open(f"./eff_num_of_nonlinearity_2.txt", "r") as fp: self.partition2 = json.load(fp)
+        with open(f"./eff_num_of_nonlinearity_3.txt", "r") as fp: self.partition3 = json.load(fp)
+        self.partition01 = self.partition0 + self.partition1
+        print(len(self.partition01), "=", len(self.partition0), "+", len(self.partition1))
+        print(len(self.partition2))
+        print(len(self.partition3))
+
+    def check_valid(self, arch):
+        op_names = {}
+        op_names['1<-0'] = arch[0][0][0]
+        op_names['2<-0'] = arch[1][0][0]
+        op_names['2<-1'] = arch[1][1][0]
+        op_names['3<-0'] = arch[2][0][0]
+        op_names['3<-1'] = arch[2][1][0]
+        op_names['3<-2'] = arch[2][2][0]
+    
+        case1 = op_names['1<-0']=='none' and op_names['2<-0']=='none' and op_names['3<-0']=='none'
+        case2 = op_names['1<-0']=='none' and op_names['3<-0']=='none' and op_names['3<-2']=='none'
+        case3 = op_names['3<-0']=='none' and op_names['3<-1']=='none' and op_names['3<-2']=='none'
+    
+        if any([case1,case2,case3]):
+            return 0
+        else:
+            return 1
 
     def get_message(self):
         string = self.extra_repr()
@@ -171,6 +198,23 @@ class UniformRandomSupernet_decom(nn.Module):
 
         return max(num_non_per_path)
 
+    def random_genotype_wotrash_balanced(self):
+        tind = torch.randint(0,3,(1,))
+        if tind==0:
+            selected = self.partition01
+        elif tind==1:
+            selected = self.partition2
+        else:
+            selected = self.partition3
+
+        genotypes = selected[torch.randint(0,len(selected),(1,))]
+        while not self.check_valid(genotypes):
+            genotypes = selected[torch.randint(0,len(selected),(1,))]
+        
+        arch = Structure(genotypes)
+        return arch
+
+
     def forward(self, inputs, arch=None):
         if arch is not None: 
             NUM_WITHIN_CELL = self.get_num_of_nonlinear(arch)
@@ -187,15 +231,20 @@ class UniformRandomSupernet_decom(nn.Module):
                 else:
                     feature = cell.forward_dynamic(feature, self.random_genotype())
             elif isinstance(cell, nn.ModuleList):
+#                tind = torch.randint(0,3,(1,))
+#                if tind == 0:
+#                    tmp = cell[0]
+#                if tind == 1:
+#                    tmp = cell[1]
+#                if tind == 2:
+#                    tmp = cell[2]
+
                 acc_num += [acc_num[-1] + NUM_WITHIN_CELL]
                 if acc_num[-1] <= self.MIN:
-                    #print(index, 0)
                     tmp = cell[0]
                 if acc_num[-1] > self.MIN and acc_num[-1] <= self.MAX:
-                    #print(index, 1)
                     tmp = cell[1]
                 if acc_num[-1] > self.MAX:
-                    #print(index, 2)
                     tmp = cell[2]
 
                 if arch is not None:

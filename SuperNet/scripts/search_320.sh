@@ -12,8 +12,8 @@ data_path="../data/cifar.python"
 
 save_dir=./SuperNet
 OUTPUT=./SuperNet/logs
-CKPT=seed-5349-last.pth
-#CKPT=seed-5983-opt5-wotrash-decom5-5-15-20-128-750/seed-5983-last.pth
+#CKPT=seed-5349-last.pth
+CKPT=seed-0-opt5-wotrash-decom5-5-15-18-128-750/seed-0-last.pth
 BN=0
 
 CUDA_VISIBLE_DEVICES=${NUM_GPU} OMP_NUM_THREADS=4 python ./SuperNet/search_320.py \

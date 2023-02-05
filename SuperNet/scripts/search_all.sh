@@ -4,7 +4,7 @@ dataset=$1
 NUM_GPU=$2
 SPLIT=$3
 
-channel=16
+channel=5 #16
 num_cells=5
 max_nodes=4
 space=nas-bench-201
@@ -13,9 +13,13 @@ data_path="../data/cifar.python"
 
 save_dir=./SuperNet
 OUTPUT=./SuperNet/logs
-#CKPT=seed-0-opt5-wotrash/seed-0-last.pth
-CKPT=seed-5349-opt5-wotrash-baseline-750/seed-5349-last.pth
-#CKPT=seed-5983-opt5-wotrash-decom5-5-15-20-128-750/seed-5983-last.pth
+SEED=1217
+
+#CKPT=seed-${SEED}-opt5-wotrash/seed-${SEED}-last.pth
+CKPT=seed-${SEED}-opt5-wotrash-baseline-5-128-1000-balanced/seed-${SEED}-last.pth
+#CKPT=seed-${SEED}-opt5-wotrash-decom5-8-20-128-500/seed-${SEED}-last.pth # K=2
+#CKPT=seed-${SEED}-opt5-wotrash-decom5-5-15-20-128-1000-balanced/seed-${SEED}-last.pth # K=3
+#CKPT=seed-${SEED}-opt5-wotrash-decom5-4-10-20-30-128-1000/seed-${SEED}-last.pth # K=4
 BN=0
 
 CUDA_VISIBLE_DEVICES=${NUM_GPU} OMP_NUM_THREADS=4 python ./SuperNet/search_all.py \

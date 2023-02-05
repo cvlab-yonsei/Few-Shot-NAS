@@ -31,7 +31,8 @@ def train(xloader, network, criterion, scheduler, w_optimizer, epoch_str, print_
   network.train()
   #for step, (base_inputs, base_targets) in enumerate(xloader):
   for step, (base_inputs, base_targets, arch_inputs, arch_targets) in enumerate(xloader):
-    valid_arch = network.random_genotype()
+    #valid_arch = network.random_genotype()
+    valid_arch = network.random_genotype_wotrash_balanced()
 
     hohoho = valid_arch.tolist('asdf')[0]
     op_cnts[0][hohoho[0][0][0]] += 1

@@ -11,7 +11,9 @@ from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from datasets.get_dataset_with_transform import get_datasets, get_nas_search_loaders
-from models.OneShot_decom import UniformRandomSupernet_decom as UniformRandomSupernet
+#from models.OneShot_decom import UniformRandomSupernet_decom as UniformRandomSupernet
+from models.OneShot_decom2 import UniformRandomSupernet_decom as UniformRandomSupernet
+#from models.OneShot_decom4 import UniformRandomSupernet_decom as UniformRandomSupernet
 from models.cell_operations import SearchSpaceNames, NAS_BENCH_201
 from utils.optimizers import get_optim_scheduler
 from utils.flop_benchmark import get_model_infos
@@ -28,7 +30,8 @@ def train(xloader, network, criterion, scheduler, w_optimizer, epoch_str, print_
   end = time.time()
   network.train()
   for step, (base_inputs, base_targets, arch_inputs, arch_targets) in enumerate(xloader):
-    valid_arch = network.random_genotype()
+    #valid_arch = network.random_genotype()
+    valid_arch = network.random_genotype_wotrash_balanced()
 
     scheduler.update(None, 1.0 * step / len(xloader))
     base_targets = base_targets.cuda(non_blocking=True)
@@ -66,6 +69,17 @@ def main(xargs):
   logger = prepare_logger(args)
 
   train_data, valid_data, xshape, class_num = get_datasets(xargs.dataset, xargs.data_path, -1)
+  search_space = SearchSpaceNames[xargs.search_space_name]
+  logger.log('search space : {:}'.format(search_space))
+
+  search_model = UniformRandomSupernet(
+      C=xargs.channel, N=xargs.num_cells, max_nodes=xargs.max_nodes,
+      num_classes=class_num, search_space=search_space, 
+      affine=False, 
+      track_running_stats=bool(xargs.track_running_stats),
+  )
+  logger.log(search_model)
+
   config = load_config(xargs.config_path, {'class_num': class_num, 'xshape': xshape}, logger)
   train_loader, _, valid_loader = get_nas_search_loaders(
       train_data,
@@ -78,23 +92,14 @@ def main(xargs):
   logger.log('||||||| {:10s} ||||||| Config={:}'.format(xargs.dataset, config))
   logger.log('||||||| {:10s} ||||||| Train-Loader-Num={:}, batch size={:}'.format(xargs.dataset, len(train_loader), config.batch_size))
 
-  search_space = SearchSpaceNames[xargs.search_space_name]
-  logger.log('search space : {:}'.format(search_space))
-
-  search_model = UniformRandomSupernet(
-      C=xargs.channel, N=xargs.num_cells, max_nodes=xargs.max_nodes,
-      num_classes=class_num, search_space=search_space, 
-      affine=False, 
-      track_running_stats=bool(xargs.track_running_stats),
-  )
-  logger.log(search_model)
-
   num_params = 0.
   num_params += sum(p.numel() for p in search_model.parameters() if p.requires_grad)
   num_params /= 1e6
   logger.log(f"# of params (M) : {num_params:.3f}")
+
   logger.log(f"Threshold MIN : {search_model.MIN}")
-  logger.log(f"Threshold MAX : {search_model.MAX}")
+#  logger.log(f"Threshold MED : {search_model.MED}")
+#  logger.log(f"Threshold MAX : {search_model.MAX}")
 
   w_optimizer, w_scheduler, criterion = get_optim_scheduler(search_model.parameters(), config)
   logger.log('optimizer : {:}'.format(w_optimizer))

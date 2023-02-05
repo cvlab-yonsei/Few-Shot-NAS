@@ -4,7 +4,7 @@ import torch
 from scipy import stats
 
 
-NAME='seed-5349-last_arch320'
+NAME='seed-0-last_arch320'
 print("-*"*10)
 print(NAME)
 print("-*"*10)

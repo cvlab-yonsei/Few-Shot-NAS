@@ -3,6 +3,7 @@
 ##############################################################################
 # Random Search and Reproducibility for Neural Architecture Search, UAI 2019 # 
 ##############################################################################
+import json
 import torch, random
 import torch.nn as nn
 from copy import deepcopy
@@ -46,6 +47,16 @@ class UniformRandomSupernet(nn.Module):
     )
     self.global_pooling = nn.AdaptiveAvgPool2d(1)
     self.classifier = nn.Linear(C_prev, num_classes)
+
+    with open(f"./eff_num_of_nonlinearity_0.txt", "r") as fp: self.partition0 = json.load(fp)
+    with open(f"./eff_num_of_nonlinearity_1.txt", "r") as fp: self.partition1 = json.load(fp)
+    with open(f"./eff_num_of_nonlinearity_2.txt", "r") as fp: self.partition2 = json.load(fp)
+    with open(f"./eff_num_of_nonlinearity_3.txt", "r") as fp: self.partition3 = json.load(fp)
+    self.partition01 = self.partition0 + self.partition1
+    print(len(self.partition01), "=", len(self.partition0), "+", len(self.partition1))
+    print(len(self.partition2))
+    print(len(self.partition3))
+
 
   def get_message(self):
     string = self.extra_repr()
@@ -101,6 +112,41 @@ class UniformRandomSupernet(nn.Module):
           genotypes.append(tuple(xlist))
       arch = Structure(genotypes)
       return arch
+
+  def check_valid(self, arch):
+      op_names = {}
+      op_names['1<-0'] = arch[0][0][0]
+      op_names['2<-0'] = arch[1][0][0]
+      op_names['2<-1'] = arch[1][1][0]
+      op_names['3<-0'] = arch[2][0][0]
+      op_names['3<-1'] = arch[2][1][0]
+      op_names['3<-2'] = arch[2][2][0]
+
+      case1 = op_names['1<-0']=='none' and op_names['2<-0']=='none' and op_names['3<-0']=='none'
+      case2 = op_names['1<-0']=='none' and op_names['3<-0']=='none' and op_names['3<-2']=='none'
+      case3 = op_names['3<-0']=='none' and op_names['3<-1']=='none' and op_names['3<-2']=='none'
+
+      if any([case1,case2,case3]):
+          return 0
+      else:
+          return 1
+
+  def random_genotype_wotrash_balanced(self):
+      tind = torch.randint(0,3,(1,))
+      if tind==0:
+          selected = self.partition01
+      elif tind==1:
+          selected = self.partition2
+      else:
+          selected = self.partition3
+
+      genotypes = selected[torch.randint(0,len(selected),(1,))]
+      while not self.check_valid(genotypes):
+          genotypes = selected[torch.randint(0,len(selected),(1,))]
+
+      arch = Structure(genotypes)
+      return arch
+
 
   def forward(self, inputs, arch=None):
     feature = self.stem(inputs)
