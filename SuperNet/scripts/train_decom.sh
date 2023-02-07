@@ -5,7 +5,7 @@ BN=$2
 NUM_GPU=$3
 SEED=$4
 
-channel=16
+channel=5 #16
 num_cells=5
 max_nodes=4
 space=nas-bench-201

@@ -11,8 +11,8 @@ from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from datasets.get_dataset_with_transform import get_datasets, get_nas_search_loaders
-#from models.OneShot_decom import UniformRandomSupernet_decom as UniformRandomSupernet
-from models.OneShot_decom2 import UniformRandomSupernet_decom as UniformRandomSupernet
+from models.OneShot_decom import UniformRandomSupernet_decom as UniformRandomSupernet
+#from models.OneShot_decom2 import UniformRandomSupernet_decom as UniformRandomSupernet
 #from models.OneShot_decom4 import UniformRandomSupernet_decom as UniformRandomSupernet
 from models.cell_operations import SearchSpaceNames, NAS_BENCH_201
 from utils.optimizers import get_optim_scheduler
@@ -99,7 +99,7 @@ def main(xargs):
 
   logger.log(f"Threshold MIN : {search_model.MIN}")
 #  logger.log(f"Threshold MED : {search_model.MED}")
-#  logger.log(f"Threshold MAX : {search_model.MAX}")
+  logger.log(f"Threshold MAX : {search_model.MAX}")
 
   w_optimizer, w_scheduler, criterion = get_optim_scheduler(search_model.parameters(), config)
   logger.log('optimizer : {:}'.format(w_optimizer))

@@ -31,7 +31,7 @@ class Logger(object):
         """Create a summary writer logging to log_dir."""
         self.seed = int(seed)
         self.log_dir = Path(log_dir) / "logs"
-        self.model_dir = Path(log_dir) / "checkpoint"
+        self.model_dir = Path(log_dir) / "checkpoint" 
         self.log_dir.mkdir(parents=True, exist_ok=True)
         if create_model_dir:
             self.model_dir.mkdir(parents=True, exist_ok=True)

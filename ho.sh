@@ -11,6 +11,6 @@
 #bash SuperNet/scripts/train_decom.sh cifar10 0 0 5983 
 
 
-bash SuperNet/scripts/search_all.sh cifar10 0 4
-bash SuperNet/scripts/search_all.sh cifar10 0 1  
+bash SuperNet/scripts/search_all.sh cifar10 0 4 
+bash SuperNet/scripts/search_all.sh cifar10 0 1
 bash SuperNet/scripts/search_all.sh cifar10 0 0

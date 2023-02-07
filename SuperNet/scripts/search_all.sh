@@ -13,12 +13,12 @@ data_path="../data/cifar.python"
 
 save_dir=./SuperNet
 OUTPUT=./SuperNet/logs
-SEED=1217
+SEED=5349
 
 #CKPT=seed-${SEED}-opt5-wotrash/seed-${SEED}-last.pth
-CKPT=seed-${SEED}-opt5-wotrash-baseline-5-128-1000-balanced/seed-${SEED}-last.pth
-#CKPT=seed-${SEED}-opt5-wotrash-decom5-8-20-128-500/seed-${SEED}-last.pth # K=2
-#CKPT=seed-${SEED}-opt5-wotrash-decom5-5-15-20-128-1000-balanced/seed-${SEED}-last.pth # K=3
+#CKPT=seed-${SEED}-opt5-wotrash-baseline-5-128-1000-balanced/seed-${SEED}-last.pth
+#CKPT=seed-${SEED}-opt5-wotrash-decom5-16-20-64-250-balanced/seed-${SEED}-last.pth # K=2
+CKPT=seed-${SEED}-opt5-wotrash-decom5-5-10-20-64-750/seed-${SEED}-last.pth # K=3
 #CKPT=seed-${SEED}-opt5-wotrash-decom5-4-10-20-30-128-1000/seed-${SEED}-last.pth # K=4
 BN=0
 

@@ -10,9 +10,9 @@ from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from datasets.get_dataset_with_transform import get_datasets, get_nas_search_loaders
-from models.OneShot import UniformRandomSupernet
+#from models.OneShot import UniformRandomSupernet
 #from models.OneShot_decom2 import UniformRandomSupernet_decom as UniformRandomSupernet
-#from models.OneShot_decom import UniformRandomSupernet_decom as UniformRandomSupernet
+from models.OneShot_decom import UniformRandomSupernet_decom as UniformRandomSupernet
 #from models.OneShot_decom4 import UniformRandomSupernet_decom as UniformRandomSupernet
 from models.cell_operations import SearchSpaceNames
 from utils.genotypes import Structure
@@ -52,8 +52,8 @@ def valid_func(train_loader, valid_loader, network, criterion, valid_arch, logge
       arch_targets = arch_targets.cuda(non_blocking=True)
 
       # prediction
-      _, logits = network(arch_inputs.cuda(non_blocking=True), valid_arch) # ADDED cuda
-      #logits = network(arch_inputs.cuda(non_blocking=True), valid_arch) # ADDED cuda
+      #_, logits = network(arch_inputs.cuda(non_blocking=True), valid_arch) # ADDED cuda
+      logits = network(arch_inputs.cuda(non_blocking=True), valid_arch) # ADDED cuda
       arch_loss = criterion(logits, arch_targets)
       # record
       arch_prec1, arch_prec5 = obtain_accuracy(logits.data, arch_targets.data, topk=(1, 5))
