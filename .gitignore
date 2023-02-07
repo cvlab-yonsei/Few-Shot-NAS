@@ -5,7 +5,6 @@
 *.npy
 *.tar
 *.pdf
-*.txt
 *.log
 
 __pycache__
