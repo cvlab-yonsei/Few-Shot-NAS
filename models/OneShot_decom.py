@@ -37,26 +37,26 @@ class UniformRandomSupernet_decom(nn.Module):
             if reduction:
                 cell = ResNetBasicblock(C_prev, C_curr, 2, affine, track_running_stats,)
             else:
-                cell = nn.ModuleList([ 
-                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats),
-                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats),
-                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats)
-                    ])
-                if num_edge is None: num_edge, edge2index = cell[0].num_edges, cell[0].edge2index
-                else: assert num_edge == cell[0].num_edges and edge2index == cell[0].edge2index, 'invalid {:} vs. {:}.'.format(num_edge, cell[0].num_edges)
-
-#                if index > 5:
-#                    cell = nn.ModuleList([ 
+#                cell = nn.ModuleList([ 
 #                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats),
 #                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats),
 #                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats)
 #                    ])
-#                    if num_edge is None: num_edge, edge2index = cell[0].num_edges, cell[0].edge2index
-#                    else: assert num_edge == cell[0].num_edges and edge2index == cell[0].edge2index, 'invalid {:} vs. {:}.'.format(num_edge, cell[0].num_edges)
-#                else:
-#                    cell = SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats)
-#                    if num_edge is None: num_edge, edge2index = cell.num_edges, cell.edge2index
-#                    else: assert num_edge == cell.num_edges and edge2index == cell.edge2index, 'invalid {:} vs. {:}.'.format(num_edge, cell.num_edges)
+#                if num_edge is None: num_edge, edge2index = cell[0].num_edges, cell[0].edge2index
+#                else: assert num_edge == cell[0].num_edges and edge2index == cell[0].edge2index, 'invalid {:} vs. {:}.'.format(num_edge, cell[0].num_edges)
+
+                if index > 5:
+                    cell = nn.ModuleList([ 
+                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats),
+                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats),
+                        SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats)
+                    ])
+                    if num_edge is None: num_edge, edge2index = cell[0].num_edges, cell[0].edge2index
+                    else: assert num_edge == cell[0].num_edges and edge2index == cell[0].edge2index, 'invalid {:} vs. {:}.'.format(num_edge, cell[0].num_edges)
+                else:
+                    cell = SearchCell(C_prev, C_curr, 1, max_nodes, search_space, affine, track_running_stats)
+                    if num_edge is None: num_edge, edge2index = cell.num_edges, cell.edge2index
+                    else: assert num_edge == cell.num_edges and edge2index == cell.edge2index, 'invalid {:} vs. {:}.'.format(num_edge, cell.num_edges)
 
             self.cells.append(cell)
             if isinstance(cell, nn.ModuleList):
@@ -74,7 +74,7 @@ class UniformRandomSupernet_decom(nn.Module):
         self.op_names   = deepcopy(search_space)
         self._Layer     = len(self.cells)
         
-        self.MIN = 10 
+        self.MIN = 15 
         self.MAX = 20 
 
         with open(f"./eff_num_of_nonlinearity_0.txt", "r") as fp: self.partition0 = json.load(fp)

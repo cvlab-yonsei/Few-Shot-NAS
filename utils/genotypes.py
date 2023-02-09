@@ -133,10 +133,12 @@ class Structure:
       for xinput in inputs: assert len(xinput.split('~')) == 2, 'invalid input length : {:}'.format(xinput)
       inputs = ( xi.split('~') for xi in inputs )
       input_infos = list( (op, int(IDX)) for (op, IDX) in inputs)
+
       all_in_nodes= list(x[1] for x in input_infos)
       for j in range(i):
         if j not in all_in_nodes: input_infos.append((default_name, j))
       node_info = sorted(input_infos, key=lambda x: (x[1], x[0]))
+      
       genotypes.append( tuple(node_info) )
     return Structure( genotypes )
 
