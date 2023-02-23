@@ -20,4 +20,5 @@ _ext
 **/.ipynb_checkpoints/
 
 
-/tb_logs
+cell_based/figures*
+cell_based/tb_logs
