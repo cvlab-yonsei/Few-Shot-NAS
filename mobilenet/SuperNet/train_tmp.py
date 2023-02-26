@@ -3,15 +3,18 @@ import sys
 import time
 import logging
 import argparse
+import random
 import numpy as np
 import torch
+import torch.backends.cudnn as cudnn
+import torch.multiprocessing as mp
+import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 ### from Detectron2 ###
 import utils.comm as comm
-from utils.engine import launch
-from utils.distributed_sampler import seed_all_rng 
+from utils.engine import _find_free_port
 
 from utils.datasets import get_datasets
 from utils.optimizers import get_optimizer_scheduler
@@ -150,10 +153,10 @@ def do_train(args, model, logger):
     logger.info(f"--> END {args.save_name}")
 
 
-def main(args):
-    args.save_name = f"{args.tag}-seed-{args.seed}"
-    args.log_path  = f"{args.save_path}/logs/{args.save_name}.txt"
-    args.ckpt_path = f"{args.save_path}/checkpoint/{args.save_name}.pt"
+def main_worker(gpu, ngpus_per_node, args):
+    if args.distributed:
+        dist.init_process_group(backend='nccl', init_method=args.dist_url,
+                                world_size=args.world_size, rank=comm.get_local_rank())
 
     logger = logging.getLogger("SuperNet Training")
     logger.setLevel(logging.DEBUG)
@@ -171,14 +174,11 @@ def main(args):
     for arg in vars(args):
         logger.info(f'{arg:<20}: {getattr(args, arg)}')
 
-    # make sure each worker has a different, yet deterministic seed if specified
-    seed_all_rng(None if args.seed < 0 else args.seed + comm.get_rank())
-
     search_space = SearchSpaceNames[args.search_space]
     model = SuperNet(search_space, affine=True, track_running_stats=True, freeze_bn=args.freeze_bn).to(torch.device("cuda"))
     if args.num_gpus > 1:
         if not args.freeze_bn: torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        model = DDP(model, device_ids=[comm.get_local_rank()], broadcast_buffers=False, find_unused_parameters=False) 
+        model = DDP(model, device_ids=[comm.get_local_rank()])#, broadcast_buffers=False, find_unused_parameters=False) 
         #model = DDP(model, device_ids=[comm.get_local_rank()], find_unused_parameters=True) 
         #model = DDP(model, device_ids=[comm.get_local_rank()], output_device=[comm.get_local_rank()]) 
         #model = DDP(model, device_ids=[comm.get_local_rank()], output_device=comm.get_local_rank(), find_unused_parameters=True) 
@@ -223,4 +223,31 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    launch(main, args.num_gpus, args=(args,)) 
+
+    if args.seed is not None:
+        random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        cudnn.deterministic = True
+        cudnn.benchmark = True #False
+
+    args.save_name = f"{args.tag}-seed-{args.seed}"
+    args.log_path  = f"{args.save_path}/logs/{args.save_name}.txt"
+    args.ckpt_path = f"{args.save_path}/checkpoint/{args.save_name}.pt"
+
+    num_machines = 1
+    port = _find_free_port()
+    args.dist_url = f"tcp://127.0.0.1:{port}"
+    args.world_size = num_machines * args.num_gpus
+    args.distributed = args.world_size > 1 
+
+    if torch.cuda.is_available():
+        ngpus_per_node = torch.cuda.device_count()
+    else:
+        ngpus_per_node = 1
+
+    if args.distributed:
+        args.world_size = ngpus_per_node * args.world_size
+        mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args))
+    else:
+        main_worker(0, ngpus_per_node, args)
+

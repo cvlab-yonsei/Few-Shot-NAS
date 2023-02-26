@@ -1,5 +1,5 @@
 import torch.nn as nn
-from models.operations import Select_one_OP, OPS 
+from models.layers import FrozenBatchNorm2d, Select_one_OP, OPS 
 
 
 class SuperNet_decom(nn.Module):
@@ -29,6 +29,7 @@ class SuperNet_decom(nn.Module):
         input_channel = first_cell_width
 
         self.blocks = nn.ModuleList()
+        self.choices = []
         for c, n, s in self.interverted_residual_setting:
             output_channel = int(c * width_mult)
             for i in range(n):
@@ -40,6 +41,7 @@ class SuperNet_decom(nn.Module):
                     tmp = nn.ModuleList(
                         [Select_one_OP(search_space, input_channel, output_channel, 1, affine, track_running_stats) for _ in range(K)]
                     )
+                    self.choices[-1].append(-1) # Add an identity layer
                 self.blocks.append( tmp )
                 input_channel = output_channel
 
@@ -54,16 +56,29 @@ class SuperNet_decom(nn.Module):
             nn.Linear(last_channel, n_class),
         )
 
+        self.initialize()
 
-#        for m in self.modules():
-#            if isinstance(m, nn.Conv2d):
-#                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-#                m.weight.data.normal_(0, math.sqrt(2. / n))
-#
-#            if isinstance(m, nn.BatchNorm2d):
-#                m.weight.data.fill_(1)
-#                m.bias.data.zero_()
-#                m.affine = True
+    def initialize(self): 
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d): # he_fout
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                # if init_div_groups:
+                #     n /= m.groups
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+
+            elif isinstance(m, nn.BatchNorm2d):
+                if m.affine:
+                    m.weight.data.fill_(1)
+                    m.bias.data.zero_()
+
+            elif isinstance(m, nn.Linear):
+                stdv = 1. / math.sqrt(m.weight.size(1))
+                m.weight.data.uniform_(-stdv, stdv)
+                if m.bias is not None:
+                    m.bias.data.zero_()
+
+    def freeze_bn(self):
+        FrozenBatchNorm2d.convert_frozen_batchnorm(self)
 
     def forward(self, x, arch):
         x = self.first_conv(x)
