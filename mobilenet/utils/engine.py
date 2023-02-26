@@ -9,7 +9,7 @@ from utils import comm
 
 __all__ = ["DEFAULT_TIMEOUT", "launch"]
 
-DEFAULT_TIMEOUT = timedelta(minutes=30)
+DEFAULT_TIMEOUT = timedelta(minutes=1)#30)
 
 
 def _find_free_port():

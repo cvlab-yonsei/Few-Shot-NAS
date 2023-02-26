@@ -39,7 +39,7 @@ class SuperNet(nn.Module):
                     self.blocks.append( Select_one_OP(search_space, input_channel, output_channel, s, affine, track_running_stats) )
                 else:
                     self.blocks.append( Select_one_OP(search_space, input_channel, output_channel, 1, affine, track_running_stats) )
-                    self.choices[-1].append(-1) # Add an identity layer
+                    self.choices[-1].append( len(search_space) ) # Add an identity layer
                 input_channel = output_channel
 
         last_channel = int(1728 * width_mult)
@@ -92,7 +92,7 @@ class SuperNet(nn.Module):
         x = self.first_block(x)
 
         for ops, op_ind in zip(self.blocks, arch):
-            x = ops[op_ind](x)
+            x = ops(x, op_ind)
         x = self.feature_mix_layer(x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)

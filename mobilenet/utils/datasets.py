@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 import torchvision.transforms as Tr
 import torchvision.datasets as datasets
@@ -29,13 +30,21 @@ def get_datasets(args):
     if args.valid_size is not None:
         validset = deepcopy(trainset)
         tr_ind, val_ind = split_trainset(trainset.targets, args.valid_size)
-        trainset.samples = np.array(trainset.samples)[tr_ind].tolist()
-        trainset.targets = np.array(trainset.targets)[tr_ind].tolist()
-        trainset.imgs    = np.array(trainset.imgs)[tr_ind].tolist()
-        
-        validset.samples = np.array(validset.samples)[val_ind].tolist()
-        validset.targets = np.array(validset.targets)[val_ind].tolist()
-        validset.imgs    = np.array(validset.imgs)[val_ind].tolist()
+        tmp_samples = pd.DataFrame( trainset.samples )
+
+        tr_samples = tmp_samples.iloc[tr_ind].to_numpy().tolist()
+        tr_imgs    = deepcopy(tr_samples)
+        tr_targets = tmp_samples.iloc[tr_ind, 1].tolist()
+        val_samples = tmp_samples.iloc[val_ind].to_numpy().tolist()
+        val_imgs    = deepcopy(val_samples)
+        val_targets = tmp_samples.iloc[val_ind, 1].tolist()
+
+        trainset.samples = tr_samples
+        trainset.targets = tr_targets
+        trainset.imgs    = deepcopy(tr_samples)
+        validset.samples = val_samples
+        validset.targets = val_targets
+        validset.imgs    = deepcopy(val_samples)
         validset.transform = valid_transforms 
         validset.transforms.transform = valid_transforms
     else:
@@ -43,23 +52,24 @@ def get_datasets(args):
 
     if args.num_gpus > 1:
         tr_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
-        te_sampler = torch.utils.data.distributed.DistributedSampler(validset)
+        te_sampler = torch.utils.data.distributed.DistributedSampler(validset, shuffle=False)
     else:
         tr_sampler = None
+        te_sampler = None
     train_loader = DataLoader(
-        trainset, batch_size=args.train_batch_size, num_workers=args.workers, 
+        trainset, batch_size=args.train_batch_size//args.num_gpus, num_workers=args.workers, 
         shuffle=(tr_sampler is None), pin_memory=True, sampler=tr_sampler
     )
     valid_loader = DataLoader(
-        validset, batch_size=args.test_batch_size, num_workers=args.workers, 
+        validset, batch_size=args.test_batch_size//args.num_gpus, num_workers=args.workers, 
         shuffle=False, pin_memory=True, sampler=te_sampler
     )
 
 #    tr_sampler = torch.utils.data.sampler.BatchSampler(
-#        TrainingSampler(len(trainset)), args.train_batch_size, drop_last=True,
+#        TrainingSampler(len(trainset)), args.train_batch_size//args.num_gpus, drop_last=True,
 #    )
 #    te_sampler = torch.utils.data.sampler.BatchSampler(
-#        InferenceSampler(len(validset)), args.test_batch_size, drop_last=False,
+#        InferenceSampler(len(validset)), args.test_batch_size//args.num_gpus, drop_last=False,
 #    )
 #
 #    train_loader = DataLoader(
@@ -70,6 +80,7 @@ def get_datasets(args):
 #        validset, num_workers=args.workers, batch_sampler=te_sampler,
 #        collate_fn=trivial_batch_collator,
 #    )
+
     return trainset, validset, train_loader, valid_loader
 
 

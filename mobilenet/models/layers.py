@@ -35,12 +35,12 @@ class Select_one_OP(nn.Module):
 
         self._ops = nn.ModuleList()
         for op_name in search_space:
-            op = OPS[op_name](C_in, C_out, stride, affine, track_running_stats)
-            self._ops.append(op)
+            self._ops.append( OPS[op_name](C_in, C_out, stride, affine, track_running_stats) )
+
+        if stride == 1:
+            self._ops += [ Identity() ]
 
     def forward(self, x, ind):
-        if ind < 0:  # Identity
-            return x
         return self._ops[ind](x)
   
 
@@ -87,6 +87,13 @@ class InvertedResidual(nn.Module):
         else:
             return x
 
+
+class Identity(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x
 
 
 class FrozenBatchNorm2d(nn.Module):
