@@ -75,7 +75,7 @@ def do_train(args, model, logger):
         for it, (img, gt) in enumerate(train_loader):
             img = img.to(torch.device("cuda"))  
 
-            rand_arch = arch_uniform_sampling()
+            rand_arch = arch_uniform_sampling(CHOICES)
             logits = model(img, rand_arch)
             loss_dict = {}
             loss_dict["loss_ce"] = criterion(logits, gt.to(torch.device("cuda")))
@@ -91,7 +91,7 @@ def do_train(args, model, logger):
             storages["CE"] += losses_reduced 
 
             if it % interval_iter_verbose == 0:
-                verbose = f"{it:5d}/{args.max_iter+1:5d}  CE: {loss_dict_reduced['loss_ce']:.4f}  "
+                verbose = f"{it:5d}/{iters_per_epoch:5d}  CE: {loss_dict_reduced['loss_ce']:.4f}  "
                 logger.info(verbose)
 
         for k in storages.keys(): storages[k] /= iters_per_epoch
@@ -112,14 +112,14 @@ def do_train(args, model, logger):
         else:
             ckpt = model.state_dict()
         info = {"state_dict": ckpt, "args": args}
-        torch.save(info, f"{self.save_path}/{name}_last.pt")
+        torch.save(info, args.ckpt_path)
     logger.info(f"--> END {args.save_name}")
 
 
 def main_worker(gpu, ngpus_per_node, args):
     if args.distributed:
         args.rank = args.rank * ngpus_per_node + gpu
-        dist.init_process_group(backend='NCCL', init_method=args.dist_url,
+        dist.init_process_group(backend='nccl', init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
 
     logger = logging.getLogger("SuperNet Training")
@@ -183,6 +183,7 @@ def get_args():
     parser.add_argument('--gpu', default=None, type=int, help='GPU id to use.')
     return parser.parse_args()
 
+
 def main():
     args = get_args()
 
@@ -195,15 +196,14 @@ def main():
     args.save_name = f"{args.tag}-seed-{args.seed}"
     args.log_path  = f"{args.save_path}/logs/{args.save_name}.txt"
     args.ckpt_path = f"{args.save_path}/checkpoint/{args.save_name}.pt"
-
-    num_machines = 1
-    args.dist_url = "tcp://127.0.0.1:23457"
-    args.world_size = num_machines * args.num_gpus
+    
+    args.dist_url    = "tcp://127.0.0.1:23456"
+    num_machines     = 1
+    ngpus_per_node   = torch.cuda.device_count()
+    args.world_size  = num_machines * ngpus_per_node
     args.distributed = args.world_size > 1 
 
-    ngpus_per_node = torch.cuda.device_count()
     if args.distributed:
-        args.world_size = ngpus_per_node * args.world_size
         mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args))
     else:
         main_worker(args.gpu, ngpus_per_node, args)

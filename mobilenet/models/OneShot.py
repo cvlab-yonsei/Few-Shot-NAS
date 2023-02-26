@@ -78,14 +78,28 @@ class SuperNet(nn.Module):
     def freeze_bn(self):
         FrozenBatchNorm2d.convert_frozen_batchnorm(self)
 
-    def arch_uniform_sampling(self):
-        rand_arch = []
-        for i, ops in enumerate(operations):
-            k = np.random.randint(len(ops))
-            select_op = ops[k]
-            rand_arch.append(select_op)
+    def get_flops(self, arch):
+        def count_conv_flop(layer, x):
+            out_h = int(x / layer.stride[0])
+            out_w = int(x / layer.stride[1])
+            delta_ops = layer.in_channels * layer.out_channels * layer.kernel_size[0] * layer.kernel_size[1] * out_h * out_w / layer.groups
+            return delta_ops
 
-        return rand_arch
+    
+        flops = count_conv_flop(self.first_conv[0], 224)
+        flops += count_conv_flop(self.first_block.depth_conv[0], 112)
+        flops += count_conv_flop(self.first_block.point_linear[0], 112)
+
+        sizes = [112] + [56]*4 + [28]*4 + [14]*8 + [7]*4
+        for ops, op_ind, ss in zip(self.blocks, arch, sizes):
+            if op_ind != 6:
+                flops += count_conv_flop(ops._ops[op_ind].inverted_bottleneck[0], ss)
+                flops += count_conv_flop(ops._ops[op_ind].depth_conv[0], ss)
+                flops += count_conv_flop(ops._ops[op_ind].point_linear[0], ss)
+
+        flops += count_conv_flop(self.feature_mix_layer[0], sizes[-1])
+        flops += self.classifier[0].weight.numel()
+        return flops
 
     def forward(self, x, arch):
         x = self.first_conv(x)

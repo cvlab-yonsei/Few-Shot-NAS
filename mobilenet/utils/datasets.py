@@ -50,6 +50,8 @@ def get_datasets(args):
     else:
         validset = datasets.ImageFolder(f"{args.data_path}/val", valid_transforms)
 
+    return trainset, validset
+
     if args.num_gpus > 1:
         tr_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
         te_sampler = torch.utils.data.distributed.DistributedSampler(validset, shuffle=False)

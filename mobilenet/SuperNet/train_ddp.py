@@ -68,42 +68,41 @@ def do_train(args, model, logger):
     ep = 1
     storages = {"CE": 0}
     interval_iter_verbose = 1 + iters_per_epoch // 10
-    for it, batch in zip(range(1, args.max_iter+1), train_loader):
-        img = torch.stack([x[0] for x in batch], dim=0).to(torch.device("cuda"))  
-        gt  = torch.tensor([x[1] for x in batch]).to(torch.device("cuda")) 
+    for ep in range(args.max_epoch):
+        if args.num_gpus > 1:
+            train_loader.sampler.set_epoch(ep)
+        for it, (img, gt) in enumerate(train_loader):
+            img = img.to(torch.device("cuda"))  
 
-        rand_arch = arch_uniform_sampling(CHOICES)
-        logits = model(img, rand_arch)
-        loss_dict = {}
-        loss_dict["loss_ce"] = criterion(logits, gt)
-        losses = sum(loss_dict.values())
-        loss_dict_reduced = {k: v.item() for k, v in comm.reduce_dict(loss_dict).items()}
-        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+            rand_arch = arch_uniform_sampling(CHOICES)
+            logits = model(img, rand_arch)
+            loss_dict = {}
+            loss_dict["loss_ce"] = criterion(logits, gt.to(torch.device("cuda")))
+            losses = sum(loss_dict.values())
+            loss_dict_reduced = {k: v.item() for k, v in comm.reduce_dict(loss_dict).items()}
+            losses_reduced = sum(loss for loss in loss_dict_reduced.values())
 
-        optimizer.zero_grad()
-        losses.backward()
-        #nn.utils.clip_grad_value_(model.parameters(), args.grad_clip)
-        optimizer.step()
-        scheduler.step() 
-        storages["CE"] += losses_reduced 
+            optimizer.zero_grad()
+            losses.backward()
+            #nn.utils.clip_grad_value_(model.parameters(), args.grad_clip)
+            optimizer.step()
+            scheduler.step() 
+            storages["CE"] += losses_reduced 
 
-        if it % interval_iter_verbose == 0:
-            verbose = f"{it:5d}/{args.max_iter+1:5d}  CE: {loss_dict_reduced['loss_ce']:.4f}  "
-            logger.info(verbose)
+            if it % interval_iter_verbose == 0:
+                verbose = f"{it:5d}/{iters_per_epoch:5d}  CE: {loss_dict_reduced['loss_ce']:.4f}  "
+                logger.info(verbose)
 
-        if it % iters_per_epoch == 0:
-            for k in storages.keys(): storages[k] /= iters_per_epoch
-            verbose = f"epoch: {ep:3d}/{args.max_epoch:3d}  avg CE: {storages['CE']:.4f}  lr: {scheduler.get_last_lr()[0]}  "
-            logger.info(verbose)
-            for k in storages.keys(): storages[k] = 0
+        for k in storages.keys(): storages[k] /= iters_per_epoch
+        verbose = f"epoch: {ep:3d}/{args.max_epoch:3d}  avg CE: {storages['CE']:.4f}  lr: {scheduler.get_last_lr()[0]}  "
+        logger.info(verbose)
+        for k in storages.keys(): storages[k] = 0
 
-#            if ep % args.interval_ep_eval == 0:
-#                scores = do_test(args, model, logger, validset, valid_loader)
-#                model.train()
-#                comm.synchronize()
-#                logger.info("\n")
-
-            ep += 1
+#        if ep % args.interval_ep_eval == 0:
+#            scores = do_test(args, model, logger, validset, valid_loader)
+#            model.train()
+#            comm.synchronize()
+#            logger.info("\n")
 
     if comm.is_main_process():
         if isinstance(model, (torch.nn.parallel.DistributedDataParallel, torch.nn.parallel.DataParallel)):
@@ -143,11 +142,7 @@ def main(args):
     model = SuperNet(search_space, affine=True, track_running_stats=True, freeze_bn=args.freeze_bn).to(torch.device("cuda"))
     if args.num_gpus > 1:
         if not args.freeze_bn: torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        #model = DDP(model, device_ids=[comm.get_local_rank()], broadcast_buffers=False, find_unused_parameters=False) 
-        #model = DDP(model, device_ids=[comm.get_local_rank()])
-        model = DDP(model, device_ids=[comm.get_local_rank()], find_unused_parameters=True) 
-        #model = DDP(model, device_ids=[comm.get_local_rank()], output_device=[comm.get_local_rank()]) 
-        #model = DDP(model, device_ids=[comm.get_local_rank()], output_device=comm.get_local_rank(), find_unused_parameters=True) 
+        model = DDP(model, device_ids=[comm.get_local_rank()], find_unused_parameters=True)
 
     start_time = time.time()
     do_train(args, model, logger)
