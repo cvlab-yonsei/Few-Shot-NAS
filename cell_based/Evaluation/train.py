@@ -91,7 +91,7 @@ def main(args):
   model = Network(args.init_channels, CIFAR_CLASSES, args.layers, args.auxiliary, genotype)
   model = model.cuda()
 
-  logging.info("param size = %fMB", count_parameters_in_MB(model))
+  logging.info("param size = %.3fMB", count_parameters_in_MB(model))
 
   criterion = nn.CrossEntropyLoss()
   criterion = criterion.cuda()
@@ -111,7 +111,7 @@ def main(args):
   logging.info("Valid-Loader-Num={:4d}, batch size={:4d}".format(len(valid_queue), args.batch_size))
 
   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, float(args.epochs))
-
+  start_time = time.time()
   for epoch in range(args.epochs):
     logging.info('epoch %3d lr %.4e', epoch, scheduler.get_lr()[0])
     model.drop_path_prob = args.drop_path_prob * epoch / args.epochs
@@ -124,6 +124,8 @@ def main(args):
     logging.info('valid_acc %.2f', valid_acc)
 
     torch.save(model.state_dict(), f"{args.save_dir}/checkpoint/{args.save_name}.pth")
+  end_time = time.time() - start_time
+  logging.info("Elapsed Time: {:.1f} s".format(end_time))
 
 
 def train(train_queue, model, criterion, optimizer):
