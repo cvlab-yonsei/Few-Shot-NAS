@@ -14,7 +14,7 @@ def get_datasets(args):
         Tr.RandomHorizontalFlip(),
         #Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), # SPOS
         #Tr.ColorJitter(brightness=32/255, saturation=0.5), # ProxylessNAS (supernet): normal
-        Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1), # ProxylessNAS (re-train): strong
+        #Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1), # ProxylessNAS (re-train): strong
         Tr.ToTensor(),
         Tr.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])

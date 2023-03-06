@@ -101,14 +101,39 @@ class SuperNet(nn.Module):
         flops += count_conv_flop(self.first_block.depth_conv[0], 112)
         flops += count_conv_flop(self.first_block.point_linear[0], 112)
 
-        sizes = [112] + [56]*4 + [28]*4 + [14]*8 + [7]*4
+        sizes = [(112, 112, 56),
+                 (56,   56, 56),
+                 (56,   56, 56),
+                 (56,   56, 56),
+
+                 (56,   56, 28),
+                 (28,   28, 28),
+                 (28,   28, 28),
+                 (28,   28, 28),
+
+                 (28,   28, 14),
+                 (14,   14, 14),
+                 (14,   14, 14),
+                 (14,   14, 14),
+
+                 (14,   14, 14),
+                 (14,   14, 14),
+                 (14,   14, 14),
+                 (14,   14, 14),
+
+                 (14,   14,  7),
+                 (7,     7,  7),
+                 (7,     7,  7),
+                 (7,     7,  7),
+
+                 (7,     7,  7)]
         for ops, op_ind, ss in zip(self.blocks, arch, sizes):
             if op_ind != 6:
-                flops += count_conv_flop(ops[op_ind].inverted_bottleneck[0], ss)
-                flops += count_conv_flop(ops[op_ind].depth_conv[0], ss)
-                flops += count_conv_flop(ops[op_ind].point_linear[0], ss)
+                flops += count_conv_flop(ops[op_ind].inverted_bottleneck[0], ss[0])
+                flops += count_conv_flop(ops[op_ind].depth_conv[0], ss[1])
+                flops += count_conv_flop(ops[op_ind].point_linear[0], ss[2])
 
-        flops += count_conv_flop(self.feature_mix_layer[0], sizes[-1])
+        flops += count_conv_flop(self.feature_mix_layer[0], sizes[-1][-1])
         flops += self.classifier[0].weight.numel()
         return flops
 
