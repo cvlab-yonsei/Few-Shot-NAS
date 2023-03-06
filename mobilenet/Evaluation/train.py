@@ -20,41 +20,28 @@ from utils.datasets import get_datasets
 from utils.optimizers import get_optimizer_scheduler
 from utils.losses import get_losses
 from utils.evaluator import Evaluator
-from models.OneShot import SuperNet
+from models.cnn import CNN
 from models.layers import SearchSpaceNames
 
 from torch.utils.tensorboard import SummaryWriter
 
-#def do_test(args, model, logger, testset, test_loader):
-#    evaluator = Evaluator(distributed=args.num_gpus > 1) 
-#    evaluator.reset()
-#    with torch.no_grad():
-#        model.eval()
-#        for batch in test_loader:
-#            img = torch.stack([x[0] for x in batch], dim=0).to(torch.device("cuda"))  
-#            gt  = torch.stack([x[1] for x in batch], dim=0).numpy()
-#            logits = model(img)
-#            pred = logits.argmax(dim=1).to(torch.device("cpu")).numpy() 
-#            evaluator.process(pred, gt)
-#    results = evaluator.evaluate()
-#    logger.info("# of Test Samples: {}".format(results["Total samples"]))
-#    logger.info(f"Top-1 acc: {results['Top1_acc']:.2f}  Top-5 acc: {results['Top5_acc']:.2f}")
-#    logger.info(f"Top-1 err: {results['Top1_err']:.2f}  Top-5 err: {results['Top5_err']:.2f}")
-#    if results is None: results = {}
-#    return results
 
-
-def arch_uniform_sampling(choices):
-    return [np.random.choice(ops) for ops in choices]
-
-def get_uniform_sample_cand(model, timeout=500):
-    fl, fu = 290, 330
-    for i in range(timeout):
-        cand = arch_uniform_sampling(model.module.choices)
-        flop = model.module.get_flops(cand)
-        if fl*1e6 <= flop <= fu*1e6:
-            return cand
-    return arch_uniform_sampling(model.module.choices)
+def do_test(args, model, logger, test_loader):
+    evaluator = Evaluator(distributed=args.num_gpus > 1) 
+    evaluator.reset()
+    with torch.no_grad():
+        model.eval()
+        for img, gt in test_loader:
+            logits = model(img.cuda(args.gpu, non_blocking=True))
+            evaluator.process(logits.to(torch.device("cpu")), gt)
+    results = evaluator.evaluate()
+    if comm.is_main_process():
+        t1, t5 = results['accs']
+        logger.info("# of Test Samples: {}".format(results["num_samples"]))
+        logger.info(f"Top-1/-5 acc: {t1:5.2f} / {t5:5.2f}")
+        logger.info(f"Top-1/-5 acc: {100-t1:5.2f} / {100-t5:5.2f}")
+    if results is None: results = {}
+    return results
 
 def do_train(args, model, logger):
     trainset, validset, train_loader, valid_loader = get_datasets(args)
@@ -75,47 +62,55 @@ def do_train(args, model, logger):
 
     writer = None
     if comm.is_main_process():
-        writer = SummaryWriter(f'./tb_logs/{args.tag}')
+        writer = SummaryWriter(f'./tb_logs/retrain/{args.tag}')
 
-    for ep in range(1, args.max_epoch+1):
-        if args.num_gpus > 1:
-            train_loader.sampler.set_epoch(ep)
-        for it, (img, gt) in enumerate(train_loader):
-            rand_arch = get_uniform_sample_cand(model)
+    ep = 1
+    train_iters = iter(train_loader)
+    for it in range(1, args.max_iter+1):
+        try:
+            img, gt = next(train_iters)
+        except:
+            train_iters = iter(train_loader)
+            img, gt = next(train_iters)
+
+        logits = model(img.cuda(args.gpu, non_blocking=True))
+        loss = criterion(logits, gt.cuda(args.gpu, non_blocking=True))
+
+        optimizer.zero_grad()
+        loss.backward()
+        #nn.utils.clip_grad_value_(model.parameters(), args.grad_clip)
+        optimizer.step()
+        scheduler.step() 
+        storages["CE"] += loss.item()
+
+        if writer is not None:
+            writer.add_scalar('loss', loss.item(), it)
+
+        if it % interval_iter_verbose == 0:
+            verbose = f"iter: {it:5d}/{args.max_iter:5d}  CE: {loss.item():.4f}  "
+            logger.info(verbose)
+
+        if it % iters_per_epoch == 0:
+            for k in storages.keys(): storages[k] /= iters_per_epoch
+            verbose = f"--> epoch: {ep:3d}/{args.max_epoch:3d}  avg CE: {storages['CE']:.4f}  lr: {scheduler.get_last_lr()[0]}  "
+            logger.info(verbose)
+            for k in storages.keys(): storages[k] = 0
             if args.num_gpus > 1:
-                rand_arch = torch.tensor(rand_arch).cuda(args.gpu)
-                torch.distributed.broadcast(rand_arch, 0)
+                train_loader.sampler.set_epoch(ep)
+
+            if ep % args.interval_ep_eval == 0:
+                scores = do_test(args, model, logger, valid_loader)
+                if writer is not None:
+                    writer.add_scalar('acc/t1', scores['accs'][0], ep)
+                model.train()
                 comm.synchronize()
+                logger.info("\n")
 
-            logits = model(img.cuda(args.gpu, non_blocking=True), rand_arch)
-            loss = criterion(logits, gt.cuda(args.gpu, non_blocking=True))
+            ep += 1
 
-            optimizer.zero_grad()
-            loss.backward()
-            #nn.utils.clip_grad_value_(model.parameters(), args.grad_clip)
-            optimizer.step()
-            scheduler.step() 
-            storages["CE"] += loss.item()
-
-            if writer is not None:
-                writer.add_scalar('loss', loss.item(), it + (ep-1)*iters_per_epoch)
-
-            if it % interval_iter_verbose == 0:
-                verbose = f"iter: {it:5d}/{iters_per_epoch:5d}  CE: {loss.item():.4f}  "
-                logger.info(verbose)
-
-        for k in storages.keys(): storages[k] /= iters_per_epoch
-        verbose = f"--> epoch: {ep:3d}/{args.max_epoch:3d}  avg CE: {storages['CE']:.4f}  lr: {scheduler.get_last_lr()[0]}  "
-        logger.info(verbose)
-        for k in storages.keys(): storages[k] = 0
-
-#        if ep % args.interval_ep_eval == 0:
-#            scores = do_test(args, model, logger, validset, valid_loader)
-#            model.train()
-#            comm.synchronize()
-#            logger.info("\n")
-
-
+    scores = do_test(args, model, logger, valid_loader)
+    if writer is not None:
+        writer.add_scalar('acc/t1', scores['accs'][0], ep)
     if comm.is_main_process():
         if isinstance(model, (torch.nn.parallel.DistributedDataParallel, torch.nn.parallel.DataParallel)):
             ckpt = model.module.state_dict()
@@ -135,7 +130,7 @@ def main_worker(gpu, ngpus_per_node, args):
         dist.init_process_group(backend='nccl', init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
 
-    logger = logging.getLogger("SuperNet Training")
+    logger = logging.getLogger("Re-training")
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
     if comm.is_main_process():
@@ -152,11 +147,11 @@ def main_worker(gpu, ngpus_per_node, args):
         logger.info(f'{arg:<20}: {getattr(args, arg)}')
 
     search_space = SearchSpaceNames[args.search_space]
-    model = SuperNet(search_space, affine=False, track_running_stats=False).cuda(args.gpu)
+    arch  = tuple(args.arch)
+    model = CNN(search_space, arch, args.drop_out).cuda(args.gpu)
     if args.num_gpus > 1:
-        #model = DDP(model, )
-        #model = DDP(model, device_ids=[args.gpu])#, find_unused_parameters=True)
-        model = DDP(model, device_ids=[args.gpu], find_unused_parameters=True)
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        model = DDP(model, device_ids=[args.gpu])
 
     start_time = time.time()
     do_train(args, model, logger)
@@ -170,26 +165,28 @@ def get_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--tag', type=str)
+    parser.add_argument('--arch', type=int, nargs='+')
     parser.add_argument('--seed', type=int, default=-1) 
 
     parser.add_argument('--data_path', type=str, default='../../data/imagenet')
-    parser.add_argument('--save_path', type=str, default='./SuperNet')
+    parser.add_argument('--save_path', type=str, default='./Evaluation')
     parser.add_argument('--search_space', type=str, default='proxyless', choices=['proxyless', 'spos', 'greedynas-v1'])
-    parser.add_argument('--valid_size', type=int, default=50000, choices=[None, 50000])
+    parser.add_argument('--valid_size', type=int, default=None, choices=[None, 50000])
 
     parser.add_argument("--num_gpus", type=int, default=2, help="the number of gpus")
     parser.add_argument('--workers', type=int, default=4) 
-    parser.add_argument('--interval_ep_eval', type=int, default=8)
+    parser.add_argument('--interval_ep_eval', type=int, default=10)
 
     parser.add_argument('--train_batch_size', type=int, default=1024) 
     parser.add_argument('--test_batch_size', type=int, default=256) 
-    parser.add_argument('--max_epoch', type=int, default=120) 
-    parser.add_argument('--learning_rate', type=float, default=0.12) 
+    parser.add_argument('--max_epoch', type=int, default=240) 
+    parser.add_argument('--learning_rate', type=float, default=0.5) 
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--weight_decay', type=float, default=4e-5)
     parser.add_argument('--nesterov', default=False, action='store_true')
     parser.add_argument('--lr_schedule_type', type=str, default='cosine', choices=['linear', 'poly', 'cosine'])
 
+    parser.add_argument('--drop_out', type=float, default=0.2)
     parser.add_argument('--label_smooth', type=float, default=0.1)
     #parser.add_argument('--grad_clip', type=float, default=5, help='gradient clipping')
     parser.add_argument('--rank', default=0, type=int, help='node rank for distributed training')
@@ -202,11 +199,13 @@ def main():
 
     if args.seed is not None:
         random.seed(args.seed)
+        np.random.seed(args.seed)
         torch.manual_seed(args.seed)
+        os.environ["PYTHONHASHSEED"] = str(args.seed)
         cudnn.deterministic = True
         cudnn.benchmark = True
 
-    args.save_name = f"{args.tag}-seed-{args.seed}"
+    args.save_name = f"Retrain-{args.tag}-seed-{args.seed}"
     args.log_path  = f"{args.save_path}/logs/{args.save_name}.txt"
     args.ckpt_path = f"{args.save_path}/checkpoint/{args.save_name}.pt"
     
@@ -224,4 +223,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

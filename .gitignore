@@ -22,3 +22,4 @@ _ext
 
 cell_based/figures*
 cell_based/tb_logs
+mobilenet/tb_logs

@@ -3,8 +3,26 @@ echo script name: $0
 TAG=$1
 SEED=$2
 
-NUM_GPU=2
-SEARCH_SPACE='proxyless'
+NUM_GPU=8
 
-CUDA_VISIBLE_DEVICES=0,1 python ./SuperNet/train_dp.py --tag ${TAG} --seed ${SEED} --num_gpus ${NUM_GPU} \
-    --nesterov --freeze_bn
+python ./SuperNet/train_ddp_ewgs2.py --tag ${TAG} --seed ${SEED} --num_gpus ${NUM_GPU} \
+    --workers 3 --nesterov
+#python ./SuperNet/train.py --tag ${TAG} --seed ${SEED} --num_gpus ${NUM_GPU} \
+#    --workers 3 --learning_rate 0.045 #--label_smooth 0 
+
+
+#TAG='val6-10'
+#python ./SuperNet/train_ddp_ewgs.py --tag ${TAG} --seed ${SEED} --num_gpus ${NUM_GPU} \
+#    --workers 3 --nesterov
+#   
+#TAG='val6-11'
+#python ./SuperNet/train_ddp_ewgs.py --tag ${TAG} --seed ${SEED} --num_gpus ${NUM_GPU} \
+#    --workers 3 --nesterov 
+#
+#TAG='val6-12'
+#python ./SuperNet/train_ddp_ewgs.py --tag ${TAG} --seed ${SEED} --num_gpus ${NUM_GPU} \
+#    --workers 3 --nesterov 
+#
+#TAG='val6-13'
+#python ./SuperNet/train_ddp_ewgs.py --tag ${TAG} --seed ${SEED} --num_gpus ${NUM_GPU} \
+#    --workers 3 --nesterov  

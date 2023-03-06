@@ -76,25 +76,24 @@ class Evaluator(DatasetEvaluator):
     def process(self, output, target, topk=(1, 5)):
         maxk = max(topk)
         batch_size = target.size(0)
-    
+
         _, pred = output.topk(maxk, 1, True, True)
         pred = pred.t()
         correct = pred.eq(target.view(1, -1).expand_as(pred))
-    
+
         res = []
         for k in topk:
             correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
             res.append(correct_k)
-       
-        self._top1 += res[0] 
-        self._top5 += res[1] 
+
+        self._top1 += res[0].item() 
+        self._top5 += res[1].item()
         self._total_samples += batch_size
- 
+
     def evaluate(self):
         """
         Computes the precision@k for the specified values of k
         """
-   
         if self._distributed:
             synchronize()
             top1_list = all_gather(self._top1)
@@ -106,17 +105,14 @@ class Evaluator(DatasetEvaluator):
             self._top1 = 0.
             self._top5 = 0. 
             self._total_samples = 0.
-            for t1,t5,ts in zip(top1_list, top5_list, total_sample_list):
+            for t1,t5,ts in zip(top1_list, top5_list, total_samples_list):
                 self._top1 += t1
                 self._top5 += t5
                 self._total_samples += ts
-        
-        t1_acc = self._top1 / self._total_samples
-        t5_acc = self._top5 / self._total_samples
+
+        t1_acc = 100 * self._top1 / self._total_samples
+        t5_acc = 100 * self._top5 / self._total_samples
         res = {}
-        res["Total samples"] = self._total_samples
-        res["Top1_acc"] = 100 * t1_acc
-        res["Top1_err"] = 100 * (1-t1_acc)
-        res["Top5_acc"] = 100 * t5_acc
-        res["Top5_err"] = 100 * (1-t5_acc)
+        res["num_samples"] = self._total_samples
+        res["accs"] = (t1_acc, t5_acc)
         return res

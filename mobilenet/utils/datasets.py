@@ -12,9 +12,9 @@ def get_datasets(args):
     train_transforms = Tr.Compose([
         Tr.RandomResizedCrop(224, scale=(0.08, 1.0)),
         Tr.RandomHorizontalFlip(),
-        Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), # SPOS
-        #Tr.ColorJitter(brightness=32/255, saturation=0.5, # ProxylessNAS (supernet): normal
-        #Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1), # ProxylessNAS (re-train): strong
+        #Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), # SPOS
+        #Tr.ColorJitter(brightness=32/255, saturation=0.5), # ProxylessNAS (supernet): normal
+        Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1), # ProxylessNAS (re-train): strong
         Tr.ToTensor(),
         Tr.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
@@ -24,10 +24,43 @@ def get_datasets(args):
         Tr.ToTensor(),
         Tr.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
+#    if args.tag == 'val6-10':
+#        valid_transforms = Tr.Compose([
+#            Tr.RandomResizedCrop(224, scale=(0.08, 1.0)),
+#            Tr.RandomHorizontalFlip(),
+#            Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), # SPOS
+#            Tr.ToTensor(),
+#        ])
+#    elif args.tag == 'val6-11':
+#        valid_transforms = Tr.Compose([
+#            Tr.RandomResizedCrop(224, scale=(0.08, 1.0)),
+#            Tr.RandomHorizontalFlip(),
+#            Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), # SPOS
+#            Tr.ToTensor(),
+#            Tr.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+#        ])
+#    elif args.tag == 'val6-12':
+#        valid_transforms = Tr.Compose([
+#            Tr.RandomResizedCrop(224, scale=(0.08, 1.0)),
+#            Tr.RandomHorizontalFlip(),
+#            Tr.ColorJitter(brightness=32/255, saturation=0.5), # ProxylessNAS (supernet): normal
+#            Tr.ToTensor(),
+#        ])
+#    elif args.tag == 'val6-13':
+#        valid_transforms = Tr.Compose([
+#            Tr.RandomResizedCrop(224, scale=(0.08, 1.0)),
+#            Tr.RandomHorizontalFlip(),
+#            Tr.ColorJitter(brightness=32/255, saturation=0.5), # ProxylessNAS (supernet): normal
+#            Tr.ToTensor(),
+#            Tr.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+#        ])
+
+
+
 
 
     trainset = datasets.ImageFolder(f"{args.data_path}/train", train_transforms)
-    if args.valid_size is not None:
+    if args.valid_size:
         validset = deepcopy(trainset)
         tr_ind, val_ind = split_trainset(trainset.targets, args.valid_size)
         tmp_samples = pd.DataFrame( trainset.samples )
@@ -50,10 +83,8 @@ def get_datasets(args):
     else:
         validset = datasets.ImageFolder(f"{args.data_path}/val", valid_transforms)
 
-    return trainset, validset
-
     if args.num_gpus > 1:
-        tr_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
+        tr_sampler = torch.utils.data.distributed.DistributedSampler(trainset, shuffle=True)
         te_sampler = torch.utils.data.distributed.DistributedSampler(validset, shuffle=False)
     else:
         tr_sampler = None
@@ -66,23 +97,6 @@ def get_datasets(args):
         validset, batch_size=args.test_batch_size//args.num_gpus, num_workers=args.workers, 
         shuffle=False, pin_memory=True, sampler=te_sampler
     )
-
-#    tr_sampler = torch.utils.data.sampler.BatchSampler(
-#        TrainingSampler(len(trainset)), args.train_batch_size//args.num_gpus, drop_last=True,
-#    )
-#    te_sampler = torch.utils.data.sampler.BatchSampler(
-#        InferenceSampler(len(validset)), args.test_batch_size//args.num_gpus, drop_last=False,
-#    )
-#
-#    train_loader = DataLoader(
-#        trainset, num_workers=args.workers, batch_sampler=tr_sampler,
-#        collate_fn=trivial_batch_collator, worker_init_fn=worker_init_reset_seed,
-#    )
-#    valid_loader = DataLoader(
-#        validset, num_workers=args.workers, batch_sampler=te_sampler,
-#        collate_fn=trivial_batch_collator,
-#    )
-
     return trainset, validset, train_loader, valid_loader
 
 
