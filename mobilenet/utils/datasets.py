@@ -5,7 +5,6 @@ import torchvision.transforms as Tr
 import torchvision.datasets as datasets
 from copy import deepcopy
 from torch.utils.data import DataLoader
-from utils.distributed_sampler import TrainingSampler, InferenceSampler, trivial_batch_collator, worker_init_reset_seed
 
 
 def get_datasets(args):
@@ -24,40 +23,6 @@ def get_datasets(args):
         Tr.ToTensor(),
         Tr.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-#    if args.tag == 'val6-10':
-#        valid_transforms = Tr.Compose([
-#            Tr.RandomResizedCrop(224, scale=(0.08, 1.0)),
-#            Tr.RandomHorizontalFlip(),
-#            Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), # SPOS
-#            Tr.ToTensor(),
-#        ])
-#    elif args.tag == 'val6-11':
-#        valid_transforms = Tr.Compose([
-#            Tr.RandomResizedCrop(224, scale=(0.08, 1.0)),
-#            Tr.RandomHorizontalFlip(),
-#            Tr.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), # SPOS
-#            Tr.ToTensor(),
-#            Tr.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-#        ])
-#    elif args.tag == 'val6-12':
-#        valid_transforms = Tr.Compose([
-#            Tr.RandomResizedCrop(224, scale=(0.08, 1.0)),
-#            Tr.RandomHorizontalFlip(),
-#            Tr.ColorJitter(brightness=32/255, saturation=0.5), # ProxylessNAS (supernet): normal
-#            Tr.ToTensor(),
-#        ])
-#    elif args.tag == 'val6-13':
-#        valid_transforms = Tr.Compose([
-#            Tr.RandomResizedCrop(224, scale=(0.08, 1.0)),
-#            Tr.RandomHorizontalFlip(),
-#            Tr.ColorJitter(brightness=32/255, saturation=0.5), # ProxylessNAS (supernet): normal
-#            Tr.ToTensor(),
-#            Tr.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-#        ])
-
-
-
-
 
     trainset = datasets.ImageFolder(f"{args.data_path}/train", train_transforms)
     if args.valid_size:

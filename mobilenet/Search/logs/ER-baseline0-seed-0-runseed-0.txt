@@ -7951,3 +7951,34 @@
 [03/06 13:28:39] Evolutionary Search INFO: (4, 3, 6, 6, 4, 5, 2, 4, 2, 0, 4, 6, 4, 3, 2, 2, 3, 0, 0, 3, 1), 327.8M
 [03/06 13:28:39] Evolutionary Search INFO: Clear BNs....
 [03/06 13:28:39] Evolutionary Search INFO: Calibrate BNs....
+[03/06 13:31:37] Evolutionary Search INFO: ckpt                : baseline0-seed-0
+[03/06 13:31:37] Evolutionary Search INFO: seed                : 0
+[03/06 13:31:37] Evolutionary Search INFO: data_path           : ../../data/imagenet
+[03/06 13:31:37] Evolutionary Search INFO: save_path           : ./Search
+[03/06 13:31:37] Evolutionary Search INFO: search_space        : proxyless
+[03/06 13:31:37] Evolutionary Search INFO: valid_size          : 50000
+[03/06 13:31:37] Evolutionary Search INFO: num_gpus            : 1
+[03/06 13:31:37] Evolutionary Search INFO: workers             : 13
+[03/06 13:31:37] Evolutionary Search INFO: gpu                 : 0
+[03/06 13:31:37] Evolutionary Search INFO: train_batch_size    : 128
+[03/06 13:31:37] Evolutionary Search INFO: test_batch_size     : 200
+[03/06 13:31:37] Evolutionary Search INFO: population_num      : 50
+[03/06 13:31:37] Evolutionary Search INFO: max_epochs          : 20
+[03/06 13:31:37] Evolutionary Search INFO: select_num          : 10
+[03/06 13:31:37] Evolutionary Search INFO: crossover_num       : 25
+[03/06 13:31:37] Evolutionary Search INFO: mutation_num        : 25
+[03/06 13:31:37] Evolutionary Search INFO: m_prob              : 0.1
+[03/06 13:31:37] Evolutionary Search INFO: flops_limit         : 330
+[03/06 13:31:37] Evolutionary Search INFO: run_calib           : True
+[03/06 13:31:37] Evolutionary Search INFO: max_train_iters     : 200
+[03/06 13:31:37] Evolutionary Search INFO: max_test_iters      : 40
+[03/06 13:31:37] Evolutionary Search INFO: save_name           : ER-baseline0-seed-0-runseed-0
+[03/06 13:31:37] Evolutionary Search INFO: log_path            : ./Search/logs/ER-baseline0-seed-0-runseed-0.txt
+[03/06 13:31:37] Evolutionary Search INFO: ckpt_path           : ./Search/checkpoint/ER-baseline0-seed-0-runseed-0.pt
+[03/06 13:31:49] Evolutionary Search INFO: Trainset Size: 1231167
+[03/06 13:31:49] Evolutionary Search INFO: Validset Size:   50000
+[03/06 13:31:50] Evolutionary Search INFO: ==> Loading pre-trained SuperNet './SuperNet/checkpoint/baseline0-seed-0.pt'
+[03/06 13:31:50] Evolutionary Search INFO: random select ........
+[03/06 13:31:50] Evolutionary Search INFO: (4, 0, 4, 0, 0, 6, 3, 2, 5, 6, 5, 6, 0, 4, 2, 6, 2, 4, 5, 6, 4), 277.1M
+[03/06 13:31:50] Evolutionary Search INFO: Clear BNs....
+[03/06 13:31:50] Evolutionary Search INFO: Calibrate BNs....
