@@ -155,7 +155,7 @@ def get_args():
     parser.add_argument('--data_path', type=str, default='../../data/imagenet')
     parser.add_argument('--save_path', type=str, default='./SuperNet')
     parser.add_argument('--search_space', type=str, default='proxyless', choices=['proxyless', 'spos', 'greedynas-v1'])
-    parser.add_argument('--valid_size', type=int, default=50000, choices=[None, 50000])
+    parser.add_argument('--valid_size', type=int, default=50000, choices=[0, 50000])
 
     parser.add_argument("--num_gpus", type=int, default=2, help="the number of gpus")
     parser.add_argument('--workers', type=int, default=4) 
