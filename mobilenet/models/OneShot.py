@@ -1,6 +1,6 @@
 import math
 import torch.nn as nn
-from models.layers import OPS
+from models.layers import OPS, Identity
 
 
 class SuperNet(nn.Module):
@@ -128,10 +128,11 @@ class SuperNet(nn.Module):
 
                  (7,     7,  7)]
         for ops, op_ind, ss in zip(self.blocks, arch, sizes):
-            if op_ind != 6:
-                flops += count_conv_flop(ops[op_ind].inverted_bottleneck[0], ss[0])
-                flops += count_conv_flop(ops[op_ind].depth_conv[0], ss[1])
-                flops += count_conv_flop(ops[op_ind].point_linear[0], ss[2])
+            if isinstance(ops[op_ind], Identity):
+                continue
+            flops += count_conv_flop(ops[op_ind].inverted_bottleneck[0], ss[0])
+            flops += count_conv_flop(ops[op_ind].depth_conv[0], ss[1])
+            flops += count_conv_flop(ops[op_ind].point_linear[0], ss[2])
 
         flops += count_conv_flop(self.feature_mix_layer[0], sizes[-1][-1])
         flops += self.classifier[0].weight.numel()
