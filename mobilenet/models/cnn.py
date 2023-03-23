@@ -57,6 +57,7 @@ class CNN(nn.Module):
                     tmp = OPS[op_name](input_channel, output_channel, 1, affine, track_running_stats)
                 self.blocks.append( tmp )
                 input_channel = output_channel
+        assert len(arch)==ind, f"len(arch)={len(arch)} is not equivalent to # of layers={ind} !"
 
         # last_channel = int(1728 * width_mult)
         last_channel = int(1280 * width_mult)
