@@ -7,7 +7,8 @@ from copy import deepcopy
 
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from utils.datasets import get_datasets
-from models.OneShot import SuperNet
+from models.OneShot_decom import SuperNet_decom as SuperNet
+from models.OneShot import SuperNet as Dummy
 from models.layers import SearchSpaceNames
 
 CHOICE = lambda x: x[np.random.randint(len(x))] if isinstance(x, tuple) else CHOICE(tuple(x))
@@ -120,6 +121,8 @@ class EvolutionSearcher(object):
         self.keep_top_k = {self.select_num: [], 50: []}
         self.memory = []
         self.epoch = 0
+
+        self.dummy = Dummy(SearchSpaceNames[args.search_space], affine=False, track_running_stats=False).cuda(args.gpu)
 
 
     def save_checkpoint(self):
@@ -254,7 +257,8 @@ class EvolutionSearcher(object):
             return False
 
         if 'flops' not in info:
-            info['flops'] = self.model.get_flops(cand)
+            #info['flops'] = self.model.get_flops(cand)
+            info['flops'] = self.dummy.get_flops(cand) # NOTE ! ! !
 
         if info['flops'] > self.flops_limit:
             print(f"flops limit exceed {info['flops']/1e6:.1f}M")
@@ -307,7 +311,7 @@ def main():
 
     search_space = SearchSpaceNames[args.search_space]
     logger.info(search_space)
-    model = SuperNet(search_space, affine=False, track_running_stats=False).cuda(args.gpu)
+    model = SuperNet(args.num_K, tuple(args.thresholds), search_space, affine=False, track_running_stats=False).cuda(args.gpu)
     logger.info(model.choices)
     pret_path = f"./SuperNet/checkpoint/{args.ckpt}.pt"
     logger.info(f"==> Loading pre-trained SuperNet '{pret_path}'")
@@ -332,11 +336,12 @@ def main():
         logger.info(f"No.{ind+1:2d}: {cand} w/ {flops:.1f}M, (Top-1/-5) acc {t1:.2f}/{t5:.2f}")
 
 
-
 def get_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--ckpt', type=str)
+    parser.add_argument('--num_K', type=int)
+    parser.add_argument('--thresholds', type=int, nargs='+')
 
     parser.add_argument('--seed', type=int, default=-1)
     parser.add_argument('--data_path', type=str, default='/dataset/imagenet')
