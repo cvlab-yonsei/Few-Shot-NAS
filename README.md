@@ -4,7 +4,6 @@
 ## Get started
 ```bash
 cd mobilenet
-mkdir SuperNet/checkpoint Search/checkpoint Evaluation/checkpoint
 mkdir -p tb_logs/supernet tb_logs/retrain
 ```
 
