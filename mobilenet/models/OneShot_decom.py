@@ -1,37 +1,37 @@
 import math
 import torch.nn as nn
-from models.layers import OPS
+from models.layers import OPS, Identity
 
 
 class SuperNet_decom(nn.Module):
-    def __init__(self, K, search_space, affine, track_running_stats, n_class=1000, input_size=224, width_mult=1.):
+    def __init__(self, K, thresholds, search_space, affine, track_running_stats, n_class=1000, input_size=224, width_mult=1.):
         super(SuperNet_decom, self).__init__()
+        assert K-1==len(thresholds)
+
+        KK=K #2
+        self.interverted_residual_setting = [
+            # channel, layers, stride
+            [32//KK,  4, 2],
+            [40//KK,  4, 2],
+            [80//KK,  4, 2],
+            [96//KK,  4, 1],
+            [192//KK, 4, 2],
+            [320//KK, 1, 1],
+        ]
+        input_channel    = int((32//KK) * width_mult)
+        first_cell_width = int((16//KK) * width_mult)
 
 #        self.interverted_residual_setting = [
 #            # channel, layers, stride
-#            [32//K,  4, 2],
-#            [56//K,  4, 2],
-#            [112//K, 4, 2],
-#            [128//K, 4, 1],
-#            [256//K, 4, 2],
-#            [432//K, 1, 1],
+#            [32,  4, 2],
+#            [40,  4, 2],
+#            [80,  4, 2],
+#            [96,  4, 1],
+#            [192, 4, 2],
+#            [320, 1, 1],
 #        ]
-#
-#        input_channel = int((40//K) * width_mult)
-#        first_cell_width = int((24//K) * width_mult)
-
-        self.interverted_residual_setting = [
-            # channel, layers, stride
-            [24//K,  4, 2],
-            [40//K,  4, 2],
-            [80//K,  4, 2],
-            [96//K,  4, 1],
-            [192//K, 4, 2],
-            [320//K, 1, 1],
-        ]
-
-        input_channel    = int((32//K) * width_mult)
-        first_cell_width = int((16//K) * width_mult)
+#        input_channel    = int(32 * width_mult)
+#        first_cell_width = int(16 * width_mult)
 
         self.first_conv = nn.Sequential(
             nn.Conv2d(3, input_channel, 3, 2, 1, bias=False),
@@ -53,11 +53,11 @@ class SuperNet_decom(nn.Module):
                     op_list = [ nn.ModuleList([OPS[op_name](input_channel, output_channel, 1, affine, track_running_stats) for op_name in search_space]) for _ in range(K) ]
                 op_list = nn.ModuleList(op_list)
                 self.blocks.append( op_list )
-                self.choices.append( len(op_list) )
+                self.choices.append( len(op_list[0]) )
                 input_channel = output_channel
 
-        # last_channel = int((1728//K) * width_mult)
-        last_channel = int((1280//K) * width_mult)
+        last_channel = int((1280//KK) * width_mult)
+        #last_channel = int(1280 * width_mult)
         self.feature_mix_layer = nn.Sequential(
             nn.Conv2d(input_channel, last_channel, 1, 1, 0, bias=False),
             nn.BatchNorm2d(last_channel, affine=affine, track_running_stats=track_running_stats),
@@ -68,6 +68,7 @@ class SuperNet_decom(nn.Module):
             nn.Linear(last_channel, n_class),
         )
 
+        self.thresholds = thresholds
         self.initialize()
 
     def initialize(self): 
@@ -89,35 +90,51 @@ class SuperNet_decom(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
-    def get_flops(self, arch):
-        def count_conv_flop(layer, x):
-            out_h = int(x / layer.stride[0])
-            out_w = int(x / layer.stride[1])
-            delta_ops = layer.in_channels * layer.out_channels * layer.kernel_size[0] * layer.kernel_size[1] * out_h * out_w / layer.groups
-            return delta_ops
-
-    
-        flops = count_conv_flop(self.first_conv[0], 224)
-        flops += count_conv_flop(self.first_block.depth_conv[0], 112)
-        flops += count_conv_flop(self.first_block.point_linear[0], 112)
-
-        sizes = [112] + [56]*4 + [28]*4 + [14]*8 + [7]*4
-        for ops, op_ind, ss in zip(self.blocks, arch, sizes):
-            if op_ind != 6:
-                flops += count_conv_flop(ops[op_ind].inverted_bottleneck[0], ss)
-                flops += count_conv_flop(ops[op_ind].depth_conv[0], ss)
-                flops += count_conv_flop(ops[op_ind].point_linear[0], ss)
-
-        flops += count_conv_flop(self.feature_mix_layer[0], sizes[-1])
-        flops += self.classifier[0].weight.numel()
-        return flops
-
     def forward(self, x, arch):
         x = self.first_conv(x)
         x = self.first_block(x)
 
+        ENN = 2 * (21 - sum(arch==6)) # NOTE: HARD CODE [6, arch: tensor] only
+#        if ENN <= self.thresholds[0]:
+#            k_ind = 0
+#        else:
+#            k_ind = 1 
+
+        if ENN == self.thresholds[0]:
+            k_ind = 0
+        elif ENN == self.thresholds[1]:
+            k_ind = 1
+        elif ENN == self.thresholds[2]:
+            k_ind = 2
+        else:
+            k_ind = 3 
+
+#        if ENN <= self.thresholds[0]:
+#            k_ind = 0
+#        elif self.thresholds[0] < ENN <= self.thresholds[1]:
+#            k_ind = 1
+#        elif self.thresholds[1] < ENN <= self.thresholds[2]:
+#            k_ind = 2
+#        elif self.thresholds[2] < ENN <= self.thresholds[3]:
+#            k_ind = 3
+#        elif self.thresholds[3] < ENN <= self.thresholds[4]:
+#            k_ind = 4
+#        else:
+#            k_ind = 5
+
         for ops, op_ind in zip(self.blocks, arch):
-            x = ops[op_ind](x)
+            x = ops[k_ind][op_ind](x)
+#        _accumulated = [0] 
+#        for ops, op_ind in zip(self.blocks, arch):
+#            if _accumulated[-1] <= self.thresholds[0]:
+#                tmp = ops[0]
+#            else:
+#                tmp = ops[1]
+#            x = tmp[op_ind](x)
+#            if isinstance(tmp[op_ind], Identity):
+#                _accumulated += [_accumulated[-1]]
+#            else:
+#                _accumulated += [_accumulated[-1] + 2]
         x = self.feature_mix_layer(x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)

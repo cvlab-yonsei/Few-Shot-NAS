@@ -20,22 +20,78 @@ from utils.datasets import get_datasets
 from utils.optimizers import get_optimizer_scheduler
 from utils.losses import get_losses
 from utils.evaluator import Evaluator
-from models.OneShot import SuperNet
+from models.OneShot_decom import SuperNet_decom as SuperNet
 from models.layers import SearchSpaceNames
 
 from torch.utils.tensorboard import SummaryWriter
 
-def arch_uniform_sampling(choices):
-    return [np.random.choice(ops) for ops in choices]
 
-def get_valid_cand(model, fl=0, fu=475, timeout=500):
-    for i in range(timeout):
-        cand = arch_uniform_sampling(model.module.choices)
-        flop = model.module.get_flops(cand)
-        if flop <= fu*1e6:
-        #if fl*1e6 <= flop <= fu*1e6:
-            return cand
-    return arch_uniform_sampling(model.module.choices)
+class Sampling():
+    def __init__(self, choices, thresholds, llimit=290, ulimit=330):
+        self.choices    = choices
+        ## For TBS
+        self.thresholds = thresholds
+        self.history    = dict((t,0) for t in range(1+len(thresholds)))
+
+        ## For Flops
+        self.llimit = llimit
+        self.ulimit = ulimit
+
+    def uni_sampling(self):
+        return [np.random.choice(ops) for ops in self.choices]
+
+    def flop_sampling(self, timeout=500):
+        for _ in range(timeout):
+            cand = self.uni_sampling()
+            flop = get_flops(cand) * 1e6
+            if self.fl <= flop <= self.fu:
+                return cand
+        return self.uni_sampling()
+
+    def tbs_sampling(self, timeout=500):
+        group_ind = min(self.history, key=self.history.get)
+        for _ in range(timeout):
+            cand = self.uni_sampling()
+
+            ## Proxy
+            ENN  = 2 * (21 - cand.count(6)) # NOTE: HARD CODE
+
+            ## Greedy
+            #tmp = np.array(cand)
+            #ENN = 2*sum(tmp<6) + 4*sum((tmp>5)*(tmp<12)) 
+
+#            if ENN <= self.thresholds[0]:
+#                g_ind = 0
+#            else:
+#                g_ind = 1
+
+            if ENN == 36:
+                g_ind = 0
+            elif ENN == 38:
+                g_ind = 1
+            elif ENN == 40:
+                g_ind = 2
+            else:
+                g_ind = 3 
+
+#            if ENN <= self.thresholds[0]:
+#                g_ind = 0
+#            elif self.thresholds[0] < ENN <= self.thresholds[1]:
+#                g_ind = 1
+#            elif self.thresholds[1] < ENN <= self.thresholds[2]:
+#                g_ind = 2
+#            elif self.thresholds[2] < ENN <= self.thresholds[3]:
+#                g_ind = 3
+#            elif self.thresholds[3] < ENN <= self.thresholds[4]:
+#                g_ind = 4 
+#            else:
+#                g_ind = 5
+
+            if g_ind == group_ind:
+                self.history[group_ind] += 1
+                return cand
+        return self.uni_sampling()
+
 
 def do_train(args, model, logger):
     trainset, validset, train_loader, valid_loader = get_datasets(args)
@@ -54,6 +110,8 @@ def do_train(args, model, logger):
     storages = {"CE": 0}
     interval_iter_verbose = iters_per_epoch // 10
 
+    cand_sampler = Sampling(model.module.choices, tuple(args.thresholds))
+    logger.info(cand_sampler.history)
     writer = None
     if comm.is_main_process():
         writer = SummaryWriter(f'./tb_logs/supernet/{args.tag}')
@@ -67,8 +125,8 @@ def do_train(args, model, logger):
             train_iters = iter(train_loader)
             img, gt = next(train_iters)
 
-        #rand_arch = get_valid_cand(model)
-        rand_arch = arch_uniform_sampling(model.module.choices)
+        rand_arch = cand_sampler.uni_sampling()
+        #rand_arch = cand_sampler.tbs_sampling()
         if args.num_gpus > 1:
             rand_arch = torch.tensor(rand_arch).cuda(args.gpu)
             torch.distributed.broadcast(rand_arch, 0)
@@ -108,6 +166,7 @@ def do_train(args, model, logger):
         info = {"state_dict": ckpt, "args": args}
         torch.save(info, args.ckpt_path)
     logger.info(f"--> END {args.save_name}")
+    logger.info(cand_sampler.history)
     if writer is not None:
         writer.close()
 
@@ -137,7 +196,8 @@ def main_worker(gpu, ngpus_per_node, args):
 
     search_space = SearchSpaceNames[args.search_space]
     logger.info(search_space)
-    model = SuperNet(search_space, affine=False, track_running_stats=False).cuda(args.gpu)
+    model = SuperNet(args.num_K, tuple(args.thresholds), search_space, affine=False, track_running_stats=False).cuda(args.gpu)
+    logger.info(model.choices)
     if args.num_gpus > 1:
         model = DDP(model, device_ids=[args.gpu], find_unused_parameters=True)
 
@@ -154,6 +214,8 @@ def get_args():
 
     parser.add_argument('--tag', type=str)
     parser.add_argument('--seed', type=int, default=-1) 
+    parser.add_argument('--num_K', type=int)
+    parser.add_argument('--thresholds', type=int, nargs='+')
 
     parser.add_argument('--data_path', type=str, default='../../../dataset/ILSVRC2012')
     parser.add_argument('--save_path', type=str, default='./SuperNet')

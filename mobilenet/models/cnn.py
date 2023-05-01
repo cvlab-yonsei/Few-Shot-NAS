@@ -16,20 +16,19 @@ class CNN(nn.Module):
         #     [256, 4, 2],
         #     [432, 1, 1],
         # ]
-
         # input_channel    = int(40 * width_mult)
         # first_cell_width = int(24 * width_mult)
 
         self.interverted_residual_setting = [
             # channel, layers, stride
-            [24,  4, 2],
+            #[24,  4, 2],
+            [32,  4, 2],
             [40,  4, 2],
             [80,  4, 2],
             [96,  4, 1],
             [192, 4, 2],
             [320, 1, 1],
         ]
-
         input_channel    = int(32 * width_mult)
         first_cell_width = int(16 * width_mult)
 
@@ -57,7 +56,6 @@ class CNN(nn.Module):
                     tmp = OPS[op_name](input_channel, output_channel, 1, affine, track_running_stats)
                 self.blocks.append( tmp )
                 input_channel = output_channel
-        assert len(arch)==ind, f"len(arch)={len(arch)} is not equivalent to # of layers={ind} !"
 
         # last_channel = int(1728 * width_mult)
         last_channel = int(1280 * width_mult)

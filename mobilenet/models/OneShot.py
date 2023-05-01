@@ -7,29 +7,28 @@ class SuperNet(nn.Module):
     def __init__(self, search_space, affine, track_running_stats, n_class=1000, input_size=224, width_mult=1.):
         super(SuperNet, self).__init__()
 
-        # self.interverted_residual_setting = [
-        #     # channel, layers, stride
-        #     [32,  4, 2],
-        #     [56,  4, 2],
-        #     [112, 4, 2],
-        #     [128, 4, 1],
-        #     [256, 4, 2],
-        #     [432, 1, 1],
-        # ]
-
-        # input_channel    = int(40 * width_mult)
-        # first_cell_width = int(24 * width_mult)
+#        self.interverted_residual_setting = [
+#            # channel, layers, stride
+#            [32,  4, 2],
+#            [56,  4, 2],
+#            [112, 4, 2],
+#            [128, 4, 1],
+#            [256, 4, 2],
+#            [432, 1, 1],
+#        ]
+#        input_channel    = int(40 * width_mult)
+#        first_cell_width = int(24 * width_mult)
 
         self.interverted_residual_setting = [
             # channel, layers, stride
-            [24,  4, 2],
+            #[24,  4, 2],
+            [32,  4, 2],
             [40,  4, 2],
             [80,  4, 2],
             [96,  4, 1],
             [192, 4, 2],
             [320, 1, 1],
         ]
-
         input_channel    = int(32 * width_mult)
         first_cell_width = int(16 * width_mult)
 
@@ -56,7 +55,7 @@ class SuperNet(nn.Module):
                 self.choices.append( len(op_list) )
                 input_channel = output_channel
 
-        # last_channel = int(1728 * width_mult)
+        #last_channel = int(1728 * width_mult)
         last_channel = int(1280 * width_mult)
         self.feature_mix_layer = nn.Sequential(
             nn.Conv2d(input_channel, last_channel, 1, 1, 0, bias=False),
@@ -132,6 +131,11 @@ class SuperNet(nn.Module):
                 continue
             flops += count_conv_flop(ops[op_ind].inverted_bottleneck[0], ss[0])
             flops += count_conv_flop(ops[op_ind].depth_conv[0], ss[1])
+            if hasattr(ops[op_ind], 'se'):
+                flop_se1 = count_conv_flop(ops[op_ind].se.conv_reduce, 1)
+                flop_se2 = count_conv_flop(ops[op_ind].se.conv_expand, 1)
+                flop_se3 = ops[op_ind].se.conv_expand.out_channels*ss[2]*ss[2]
+                flops += flop_se1 + flop_se2 + flop_se3
             flops += count_conv_flop(ops[op_ind].point_linear[0], ss[2])
 
         flops += count_conv_flop(self.feature_mix_layer[0], sizes[-1][-1])
