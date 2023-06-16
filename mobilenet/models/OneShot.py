@@ -55,7 +55,7 @@ class SuperNet(nn.Module):
                 self.choices.append( len(op_list) )
                 input_channel = output_channel
 
-        # last_channel = int(1728 * width_mult)
+        #last_channel = int(1728 * width_mult)
         last_channel = int(1280 * width_mult)
         self.feature_mix_layer = nn.Sequential(
             nn.Conv2d(input_channel, last_channel, 1, 1, 0, bias=False),

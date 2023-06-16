@@ -1727,3 +1727,7 @@ Parameter Group 1
 [06/16 04:13:55] Re-training INFO: iter: 148375/300480  CE: 2.6769  
 [06/16 04:15:20] Re-training INFO: iter: 148500/300480  CE: 2.7557  
 [06/16 04:16:42] Re-training INFO: iter: 148625/300480  CE: 2.7100  
+[06/16 04:18:06] Re-training INFO: iter: 148750/300480  CE: 2.4552  
+[06/16 04:19:29] Re-training INFO: iter: 148875/300480  CE: 2.5215  
+[06/16 04:20:43] Re-training INFO: --> epoch: 119/240  avg CE: 2.6827  lr: 0.25327239889283615
+[06/16 04:21:07] Re-training INFO: iter: 149000/300480  CE: 2.7136  

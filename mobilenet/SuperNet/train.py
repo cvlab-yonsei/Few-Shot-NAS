@@ -85,7 +85,6 @@ class Sampling():
                 return cand
         return self.uni_sampling()
 
-
 def do_train(args, model, logger):
     trainset, validset, train_loader, valid_loader = get_datasets(args)
     logger.info("Trainset Size: {:7d}".format(len(trainset)))
