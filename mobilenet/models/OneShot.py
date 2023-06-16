@@ -1,6 +1,6 @@
 import math
 import torch.nn as nn
-from models.layers import OPS
+from models.layers import OPS, Identity
 
 
 class SuperNet(nn.Module):
@@ -16,20 +16,19 @@ class SuperNet(nn.Module):
         #     [256, 4, 2],
         #     [432, 1, 1],
         # ]
-
         # input_channel    = int(40 * width_mult)
         # first_cell_width = int(24 * width_mult)
 
         self.interverted_residual_setting = [
             # channel, layers, stride
-            [24,  4, 2],
+            #[24,  4, 2],
+            [32,  4, 2],
             [40,  4, 2],
             [80,  4, 2],
             [96,  4, 1],
             [192, 4, 2],
             [320, 1, 1],
         ]
-
         input_channel    = int(32 * width_mult)
         first_cell_width = int(16 * width_mult)
 
@@ -128,10 +127,16 @@ class SuperNet(nn.Module):
 
                  (7,     7,  7)]
         for ops, op_ind, ss in zip(self.blocks, arch, sizes):
-            if op_ind != 6:
-                flops += count_conv_flop(ops[op_ind].inverted_bottleneck[0], ss[0])
-                flops += count_conv_flop(ops[op_ind].depth_conv[0], ss[1])
-                flops += count_conv_flop(ops[op_ind].point_linear[0], ss[2])
+            if isinstance(ops[op_ind], Identity):
+                continue
+            flops += count_conv_flop(ops[op_ind].inverted_bottleneck[0], ss[0])
+            flops += count_conv_flop(ops[op_ind].depth_conv[0], ss[1])
+            if hasattr(ops[op_ind], 'se'):
+                flop_se1, out = count_conv_flop(ops[op_ind].se.conv_reduce, x.mean((2, 3), keepdim=True))
+                flop_se2, out = count_conv_flop(ops[op_ind].se.conv_expand, out)
+                flop_se3 = ops[op_ind].se.conv_expand.out_channels*x.shape[2]*x.shape[3]
+                flops += flop_se1 + flop_se2 + flop_se3
+            flops += count_conv_flop(ops[op_ind].point_linear[0], ss[2])
 
         flops += count_conv_flop(self.feature_mix_layer[0], sizes[-1][-1])
         flops += self.classifier[0].weight.numel()

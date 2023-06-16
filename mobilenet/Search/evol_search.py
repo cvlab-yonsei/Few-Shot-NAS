@@ -336,7 +336,7 @@ def get_args():
     parser.add_argument('--ckpt', type=str)
 
     parser.add_argument('--seed', type=int, default=-1)
-    parser.add_argument('--data_path', type=str, default='../../data/imagenet')
+    parser.add_argument('--data_path', type=str, default='../../../dataset/ILSVRC2012')
     parser.add_argument('--save_path', type=str, default='./Search')
     parser.add_argument('--search_space', type=str, default='proxyless', choices=['proxyless', 'spos', 'greedynas-v1'])
     parser.add_argument('--valid_size', type=int, default=50000, choices=[0, 50000])

@@ -21,25 +21,19 @@ class SuperNet_decom(nn.Module):
         input_channel    = int((32//KK) * width_mult)
         first_cell_width = int((16//KK) * width_mult)
 
-#        self.interverted_residual_setting = [
-#            # channel, layers, stride
-#            [32,  4, 2],
-#            [40,  4, 2],
-#            [80,  4, 2],
-#            [96,  4, 1],
-#            [192, 4, 2],
-#            [320, 1, 1],
-#        ]
-#        input_channel    = int(32 * width_mult)
-#        first_cell_width = int(16 * width_mult)
+        self.first_conv = nn.ModuleList() 
+        for _ in range(K):
+            self.first_conv.append( nn.Sequential(
+                nn.Conv2d(3, input_channel, 3, 2, 1, bias=False),
+                nn.BatchNorm2d(input_channel, affine=affine, track_running_stats=track_running_stats),
+                nn.ReLU6(inplace=True),
+                )
+            )
 
-        self.first_conv = nn.Sequential(
-            nn.Conv2d(3, input_channel, 3, 2, 1, bias=False),
-            nn.BatchNorm2d(input_channel, affine=affine, track_running_stats=track_running_stats),
-            nn.ReLU6(inplace=True),
-        )
+        self.first_block = nn.ModuleList() 
+        for _ in range(K):
+            self.first_block.append( OPS['3x3_MBConv1'](input_channel, first_cell_width, 1, affine, track_running_stats) )
 
-        self.first_block = OPS['3x3_MBConv1'](input_channel, first_cell_width, 1, affine, track_running_stats)
         input_channel = first_cell_width
 
         self.blocks  = nn.ModuleList()
@@ -57,16 +51,20 @@ class SuperNet_decom(nn.Module):
                 input_channel = output_channel
 
         last_channel = int((1280//KK) * width_mult)
-        #last_channel = int(1280 * width_mult)
-        self.feature_mix_layer = nn.Sequential(
-            nn.Conv2d(input_channel, last_channel, 1, 1, 0, bias=False),
-            nn.BatchNorm2d(last_channel, affine=affine, track_running_stats=track_running_stats),
-            nn.ReLU6(inplace=True)
-        ) 
+
+        self.feature_mix_layer = nn.ModuleList() 
+        for _ in range(K):
+            self.feature_mix_layer.append( nn.Sequential(
+                nn.Conv2d(input_channel, last_channel, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(last_channel, affine=affine, track_running_stats=track_running_stats),
+                nn.ReLU6(inplace=True)
+                )
+            )
         self.avgpool    = nn.AvgPool2d(input_size//32)
-        self.classifier = nn.Sequential(
-            nn.Linear(last_channel, n_class),
-        )
+
+        self.classifier = nn.ModuleList() 
+        for _ in range(K):
+            self.classifier.append( nn.Linear(last_channel, n_class) )
 
         self.thresholds = thresholds
         self.initialize()
@@ -91,26 +89,20 @@ class SuperNet_decom(nn.Module):
                     m.bias.data.zero_()
 
     def forward(self, x, arch):
-        x = self.first_conv(x)
-        x = self.first_block(x)
-
         ENN = 2 * (21 - sum(arch==6)) # NOTE: HARD CODE [6, arch: tensor] only
-        #if ENN <= self.thresholds[0]:
-        #if ENN in [38, 40]:
-#        if int(ENN) % 4 == 0:
-        if int(ENN) in [36, 38]:
-            k_ind = 0
-        else:
-            k_ind = 1 
-
-#        if ENN == self.thresholds[0]:
+#        if int(ENN) in [36, 38]:
 #            k_ind = 0
-#        elif ENN == self.thresholds[1]:
-#            k_ind = 1
-#        elif ENN == self.thresholds[2]:
-#            k_ind = 2
 #        else:
-#            k_ind = 3 
+#            k_ind = 1 
+
+        if ENN == self.thresholds[0]:
+            k_ind = 0
+        elif ENN == self.thresholds[1]:
+            k_ind = 1
+        elif ENN == self.thresholds[2]:
+            k_ind = 2
+        else:
+            k_ind = 3 
 
 #        if ENN == self.thresholds[0]:
 #            k_ind = 0
@@ -125,21 +117,12 @@ class SuperNet_decom(nn.Module):
 #        else:
 #            k_ind = 5
 
+        x = self.first_conv[k_ind](x)
+        x = self.first_block[k_ind](x)
         for ops, op_ind in zip(self.blocks, arch):
             x = ops[k_ind][op_ind](x)
-#        _accumulated = [0] 
-#        for ops, op_ind in zip(self.blocks, arch):
-#            if _accumulated[-1] <= self.thresholds[0]:
-#                tmp = ops[0]
-#            else:
-#                tmp = ops[1]
-#            x = tmp[op_ind](x)
-#            if isinstance(tmp[op_ind], Identity):
-#                _accumulated += [_accumulated[-1]]
-#            else:
-#                _accumulated += [_accumulated[-1] + 2]
-        x = self.feature_mix_layer(x)
+        x = self.feature_mix_layer[k_ind](x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        x = self.classifier(x)
+        x = self.classifier[k_ind](x)
         return x

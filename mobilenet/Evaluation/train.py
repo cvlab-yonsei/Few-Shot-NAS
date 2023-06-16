@@ -51,8 +51,17 @@ def do_train(args, model, logger):
 
     iters_per_epoch = len(train_loader) 
     args.max_iter   = iters_per_epoch * args.max_epoch
+    if args.warmup: # NOTE: RMS
+        args.warmup_steps = int(5   * iters_per_epoch)
+        args.decay_steps  = int(2.4 * iters_per_epoch)
 
     optimizer, scheduler = get_optimizer_scheduler(args, model)
+    logger.info(optimizer) 
+    if args.warmup: # NOTE: RMS
+        scheduler_warmup  = lambda it: args.learning_rate * it / args.warmup_steps
+        #scheduler         = lambda it: args.learning_rate * 0.97 ** ((it-args.warmup_steps) / args.decay_steps) # NOTE: ZiCo style
+        #scheduler         = lambda it: args.learning_rate * 0.97 ** (it / args.decay_steps) # NOTE: MnasNet style
+    logger.info(scheduler) 
     criterion = get_losses(args).cuda(args.gpu)
 
     logger.info(f"--> START {args.save_name}")
@@ -73,14 +82,32 @@ def do_train(args, model, logger):
             train_iters = iter(train_loader)
             img, gt = next(train_iters)
 
+        if args.warmup: # NOTE: RMS
+            if it < args.warmup_steps+1: # ADD +1 [denoted by 'f']
+                _scale = scheduler_warmup(it)
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = _scale
+            else:
+                scheduler.step()
+
+#        if args.warmup: # NOTE: RMS
+#            if it < args.warmup_steps+1: # ADD +1 [denoted by 'f']
+#                _scale = scheduler_warmup(it)
+#                for param_group in optimizer.param_groups:
+#                    param_group['lr'] = _scale
+#            else:
+#                if (it-args.warmup_steps) % args.decay_steps == 0: # NOTE: staircase=True
+#                    _scale = scheduler(it)
+#                    for param_group in optimizer.param_groups:
+#                        param_group['lr'] = _scale
+
         logits = model(img.cuda(args.gpu, non_blocking=True))
         loss = criterion(logits, gt.cuda(args.gpu, non_blocking=True))
 
         optimizer.zero_grad()
         loss.backward()
-        #nn.utils.clip_grad_value_(model.parameters(), args.grad_clip)
         optimizer.step()
-        scheduler.step() 
+        scheduler.step() # NOTE: RMS 
         storages["CE"] += loss.item()
 
         if writer is not None:
@@ -92,7 +119,9 @@ def do_train(args, model, logger):
 
         if it % iters_per_epoch == 0:
             for k in storages.keys(): storages[k] /= iters_per_epoch
-            verbose = f"--> epoch: {ep:3d}/{args.max_epoch:3d}  avg CE: {storages['CE']:.4f}  lr: {scheduler.get_last_lr()[0]}  "
+            #verbose = f"--> epoch: {ep:3d}/{args.max_epoch:3d}  avg CE: {storages['CE']:.4f}  lr: {scheduler.get_last_lr()[0]}  "
+            #verbose = f"--> epoch: {ep:3d}/{args.max_epoch:3d}  avg CE: {storages['CE']:.4f}  lr: {_scale}  " # NOTE: RMS
+            verbose = f"--> epoch: {ep:3d}/{args.max_epoch:3d}  avg CE: {storages['CE']:.4f}  lr: {optimizer.param_groups[0]['lr']}" # NOTE: RMS
             logger.info(verbose)
             for k in storages.keys(): storages[k] = 0
             if args.num_gpus > 1:
@@ -147,11 +176,15 @@ def main_worker(gpu, ngpus_per_node, args):
         logger.info(f'{arg:<20}: {getattr(args, arg)}')
 
     search_space = SearchSpaceNames[args.search_space]
+    logger.info(search_space)
     arch  = tuple(args.arch)
     model = CNN(search_space, arch, args.drop_out).cuda(args.gpu)
+    num_params = sum(p.numel() for p in model.parameters()) / 1e6
+    logger.info(f'# of Params : {num_params:.3f}')
     if args.num_gpus > 1:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = DDP(model, device_ids=[args.gpu])
+    logger.info(model)
 
     start_time = time.time()
     do_train(args, model, logger)
@@ -168,9 +201,9 @@ def get_args():
     parser.add_argument('--arch', type=int, nargs='+')
     parser.add_argument('--seed', type=int, default=-1) 
 
-    parser.add_argument('--data_path', type=str, default='../../data/imagenet')
+    parser.add_argument('--data_path', type=str, default='../../../dataset/ILSVRC2012')
     parser.add_argument('--save_path', type=str, default='./Evaluation')
-    parser.add_argument('--search_space', type=str, default='proxyless', choices=['proxyless', 'spos', 'greedynas-v1'])
+    parser.add_argument('--search_space', type=str, default='proxyless', choices=['proxyless', 'spos', 'greedy'])
     parser.add_argument('--valid_size', type=int, default=0, choices=[0, 50000])
 
     parser.add_argument("--num_gpus", type=int, default=2, help="the number of gpus")
@@ -186,6 +219,7 @@ def get_args():
     parser.add_argument('--nesterov', default=False, action='store_true')
     parser.add_argument('--lr_schedule_type', type=str, default='cosine', choices=['linear', 'poly', 'cosine'])
 
+    parser.add_argument('--warmup', default=False, action='store_true')
     parser.add_argument('--drop_out', type=float, default=0.2)
     parser.add_argument('--label_smooth', type=float, default=0.1)
     #parser.add_argument('--grad_clip', type=float, default=5, help='gradient clipping')

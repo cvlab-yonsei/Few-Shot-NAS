@@ -20,19 +20,21 @@ from utils.datasets import get_datasets
 from utils.optimizers import get_optimizer_scheduler
 from utils.losses import get_losses
 from utils.evaluator import Evaluator
-from models.OneShot import SuperNet
+#from models.OneShot_decom import SuperNet_decom as SuperNet
+from models.OneShot_decom_non import SuperNet_decom as SuperNet
 from models.layers import SearchSpaceNames
 
 from torch.utils.tensorboard import SummaryWriter
+
 
 class Sampling():
     def __init__(self, choices, thresholds, llimit=290, ulimit=330):
         self.choices    = choices
         ## For TBS
         self.thresholds = thresholds
-        self.history    = dict((t,0) for t in range(2))
-        #self.history    = dict((t,0) for t in range(1+len(thresholds)))
-        
+        self.history    = dict((t,0) for t in range(1+len(thresholds)))
+        #self.history    = dict((t,0) for t in range(2)) # NOTE ! ! !
+
         ## For Flops
         self.llimit = llimit
         self.ulimit = ulimit
@@ -48,42 +50,42 @@ class Sampling():
                 return cand
         return self.uni_sampling()
 
-    def tbs_sampling(self, timeout=500):
-        group_ind = min(self.history, key=self.history.get)
-        for _ in range(timeout):
-            cand = self.uni_sampling()
-
-            ## Proxy 
-            ENN  = 2 * (21 - cand.count(6)) # NOTE: HARD CODE
-
-            ## Greedy
-#            tmp = np.array(cand)
-#            ENN = 2*sum(tmp<6) + 4*sum((tmp>5)*(tmp<12))
-            
-            # if ENN <= self.thresholds[0]:
-#            if ENN in self.thresholds:
-#                g_ind = 0
+#    def TBS_sampling(self, timeout=500):
+#        output = []
+#        do_sample1 = True
+#        do_sample2 = True
+#        for _ in range(timeout):
+#            if not do_sample1 and not do_sample2:
+#                break
+#            cand = self.uni_sampling()
+#            ENN  = 2 * (21 - cand.count(6)) # NOTE: HARD CODE
+#            if int(ENN) in [36, 38]: # NOTE HARD CODE ! ! !~
+#                if do_sample1:
+#                    # print("hi", ENN)
+#                    output.append( cand )
+#                    do_sample1 = False
 #            else:
-#                g_ind = 1
+#                if do_sample2:
+#                    # print("ho", ENN)
+#                    output.append( cand )
+#                    do_sample2 = False
+#        return output
 
-#            if ENN <= self.thresholds[0]:
-#                g_ind = 0
-#            elif ENN == self.thresholds[1]:
-#                g_ind = 1
-#            else:
-#                g_ind = 2
-
-            if ENN == 38:
-                g_ind = 0
-            elif ENN == 40:
-                g_ind = 1
-            else:
-                g_ind = 2
-
-            if g_ind == group_ind:
-                self.history[group_ind] += 1
-                return cand
-        return self.uni_sampling()
+    def TBS_sampling(self, timeout=500):
+        output = []
+        for ind in range(1+len(self.thresholds)):
+            for _ in range(timeout):
+                cand = self.uni_sampling()
+                ENN  = 2 * (21 - cand.count(6)) # NOTE: HARD CODE
+                if ind < len(self.thresholds): # NOTE HARD CODE ! ! !~
+                    if ENN == self.thresholds[ind]:
+                        output.append( cand )
+                        break
+                else:
+                    if not (ENN in self.thresholds):
+                        output.append( cand )
+                        break
+        return output
 
 
 def do_train(args, model, logger):
@@ -119,17 +121,25 @@ def do_train(args, model, logger):
             img, gt = next(train_iters)
 
         #rand_arch = cand_sampler.uni_sampling()
-        rand_arch = cand_sampler.tbs_sampling()
+        #rand_arch = cand_sampler.tbs_sampling()
+        rand_arch = cand_sampler.TBS_sampling()
         if args.num_gpus > 1:
             rand_arch = torch.tensor(rand_arch).cuda(args.gpu)
             torch.distributed.broadcast(rand_arch, 0)
             comm.synchronize()
-
-        logits = model(img.cuda(args.gpu, non_blocking=True), rand_arch)
-        loss = criterion(logits, gt.cuda(args.gpu, non_blocking=True))
-
+###############################
+#        logits = model(img.cuda(args.gpu, non_blocking=True), rand_arch)
+#        loss = criterion(logits, gt.cuda(args.gpu, non_blocking=True))
+#
+#        optimizer.zero_grad()
+#        loss.backward()
+###############################
         optimizer.zero_grad()
-        loss.backward()
+        for r_a in rand_arch:
+            logits = model(img.cuda(args.gpu, non_blocking=True), r_a)
+            loss = criterion(logits, gt.cuda(args.gpu, non_blocking=True))
+            loss.backward()
+###############################
         #nn.utils.clip_grad_value_(model.parameters(), args.grad_clip)
         optimizer.step()
         scheduler.step() 
@@ -189,10 +199,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
     search_space = SearchSpaceNames[args.search_space]
     logger.info(search_space)
-    model = SuperNet(search_space, affine=False, track_running_stats=False).cuda(args.gpu)
+    model = SuperNet(args.num_K, tuple(args.thresholds), search_space, affine=False, track_running_stats=False).cuda(args.gpu)
+    logger.info(model.choices)
     if args.num_gpus > 1:
         model = DDP(model, device_ids=[args.gpu], find_unused_parameters=True)
-    logger.info(model)
 
     start_time = time.time()
     do_train(args, model, logger)
@@ -207,11 +217,12 @@ def get_args():
 
     parser.add_argument('--tag', type=str)
     parser.add_argument('--seed', type=int, default=-1) 
+    parser.add_argument('--num_K', type=int)
     parser.add_argument('--thresholds', type=int, nargs='+')
 
     parser.add_argument('--data_path', type=str, default='../../../dataset/ILSVRC2012')
     parser.add_argument('--save_path', type=str, default='./SuperNet')
-    parser.add_argument('--search_space', type=str, default='proxyless', choices=['proxyless', 'spos', 'greedy'])
+    parser.add_argument('--search_space', type=str, default='proxyless', choices=['proxyless', 'spos', 'greedynas-v1'])
     parser.add_argument('--valid_size', type=int, default=50000, choices=[0, 50000])
 
     parser.add_argument("--num_gpus", type=int, default=2, help="the number of gpus")

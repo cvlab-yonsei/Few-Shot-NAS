@@ -16,20 +16,19 @@ class CNN(nn.Module):
         #     [256, 4, 2],
         #     [432, 1, 1],
         # ]
-
         # input_channel    = int(40 * width_mult)
         # first_cell_width = int(24 * width_mult)
 
         self.interverted_residual_setting = [
             # channel, layers, stride
-            [24,  4, 2],
+            #[24,  4, 2],
+            [32,  4, 2],
             [40,  4, 2],
             [80,  4, 2],
             [96,  4, 1],
             [192, 4, 2],
             [320, 1, 1],
         ]
-
         input_channel    = int(32 * width_mult)
         first_cell_width = int(16 * width_mult)
 
