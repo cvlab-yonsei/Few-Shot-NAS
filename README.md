@@ -1,4 +1,4 @@
-# starlab1
+# Few Shot NAS
 
 
 ## Get started
