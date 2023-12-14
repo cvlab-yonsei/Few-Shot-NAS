@@ -1,4 +1,4 @@
-name: gmnas
+name: fewshotnas
 channels:
   - anaconda
   - pytorch
@@ -95,4 +95,4 @@ dependencies:
   - zstd=1.5.5=hc292b87_0
   - pip:
       - ofa==0.1.0.post202307202001
-prefix: /home/oym/miniconda3/envs/gmnas
+prefix: /home/oym/miniconda3/envs/fewshotnas
